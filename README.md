@@ -6,20 +6,42 @@ A Windows desktop application for processing astrophotography data from Seestar 
 
 - **Ingest** raw FITS files from Seestar exports
 - **Organize** files into structured astrophotography projects
-- **Extract** metadata from FITS headers
+- **Extract** metadata from FITS headers (exposure time, date, object, filter, coordinates, etc.)
 - **Compute** integration time and capture statistics
 - **Safe file operations** - only copies, never modifies or deletes source data
+- **Analysis window** with search/filter for existing projects
+- **Session-level breakdowns** with frame counts and exposure times
+- **Capture location tracking** with custom tagging
+- **Google Maps integration** for each location
+- **Local tag storage** - your favorite spots persist across sessions
 
 ## Installation
 
-1. Install Python 3.9 or later from [python.org](https://www.python.org/downloads/)
+### Virtual Environment (Recommended but Optional)
 
-2. Navigate to the project directory:
+A virtual environment keeps your project dependencies isolated from other Python projects on your system, preventing version conflicts. However, for a simple app like this, you can skip it if you prefer a simpler setup.
+
+**With virtual environment:**
+- Prevents conflicts with other projects
+- Easier to reproduce the setup
+- Cleaner system-wide Python
+
+**Without virtual environment:**
+- Simpler setup (fewer steps)
+- Works fine for a single project
+- Dependencies install globally
+
+### Quick Install
+
+1. Clone the repository:
    ```cmd
-   cd "c:\Users\Guy\Seestar Processing"
+   git clone https://github.com/Gyros1981/seestar-fits-organizer.git
+   cd seestar-fits-organizer
    ```
 
-3. Create a virtual environment (recommended):
+2. Install Python 3.9 or later from [python.org](https://www.python.org/downloads/)
+
+3. (Optional) Create a virtual environment:
    ```cmd
    python -m venv venv
    venv\Scripts\activate
@@ -38,6 +60,7 @@ A Windows desktop application for processing astrophotography data from Seestar 
    ```
 
 2. In the application:
+   - Click **Browse** to select your **Seestar Directory** (original Seestar exports)
    - Click **Browse** to select your **Raw Directory** (containing `*_subs` folders)
    - Click **Browse** to select your **Projects Directory** (where organized projects will be created)
    - Click **Scan & Build Projects** to process your data
@@ -46,6 +69,13 @@ A Windows desktop application for processing astrophotography data from Seestar 
    - Frame counts (lights, darks, flats, bias)
    - Total integration time
    - File statistics
+
+4. Click **Analyze** to open the analysis window for existing projects:
+   - Search/filter projects by name, object, or location
+   - View detailed project metrics
+   - Expand sessions to see capture details
+   - Tag locations with custom names
+   - Open locations in Google Maps
 
 ## Folder Structure
 
