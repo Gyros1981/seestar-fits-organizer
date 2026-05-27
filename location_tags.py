@@ -69,18 +69,44 @@ class LocationTags:
         except Exception as e:
             logger.error(f"Failed to save location tags: {e}")
     
-    def get_tag(self, lat: str, lon: str) -> Optional[Dict]:
-        """Get tag for a location.
+    def get_tag(self, lat: str, lon: str, threshold: float = 0.005) -> Optional[Dict]:
+        """Get tag for a location with fuzzy matching.
         
         Args:
             lat: Latitude
             lon: Longitude
+            threshold: Distance threshold in degrees for fuzzy matching (default: 0.005 ≈ 600 yards)
             
         Returns:
             Tag dictionary with 'name', 'notes', 'created_at' or None
         """
+        # First try exact match
         key = f"{lat},{lon}"
-        return self.tags.get(key)
+        if key in self.tags:
+            return self.tags[key]
+        
+        # If no exact match, try fuzzy matching
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+            
+            for tag_key, tag_value in self.tags.items():
+                try:
+                    tag_lat, tag_lon = tag_key.split(',')
+                    tag_lat_f = float(tag_lat)
+                    tag_lon_f = float(tag_lon)
+                    
+                    # Calculate Euclidean distance
+                    distance = ((tag_lat_f - lat_f) ** 2 + (tag_lon_f - lon_f) ** 2) ** 0.5
+                    
+                    if distance < threshold:
+                        return tag_value
+                except (ValueError, TypeError):
+                    continue
+        except (ValueError, TypeError):
+            pass
+        
+        return None
     
     def set_tag(self, lat: str, lon: str, name: str, notes: str = ""):
         """Set tag for a location.

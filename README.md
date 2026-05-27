@@ -1,4 +1,4 @@
-# Seestar Astronomy Helper App
+# Seestar FITS Organizer
 
 A Windows desktop application for processing astrophotography data from Seestar telescopes.
 

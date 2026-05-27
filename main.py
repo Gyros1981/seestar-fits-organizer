@@ -21,7 +21,7 @@ class SeestarApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        self.title("Seestar Astronomy Helper")
+        self.title("Seestar FITS Organizer")
         self.geometry("1000x700")
         
         self.seestar_dir = None
@@ -43,7 +43,7 @@ class SeestarApp(ctk.CTk):
         # Title
         title_label = ctk.CTkLabel(
             main_frame, 
-            text="Seestar Astronomy Helper",
+            text="Seestar FITS Organizer",
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title_label.pack(pady=(0, 20))
@@ -62,7 +62,7 @@ class SeestarApp(ctk.CTk):
         self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="gray")
         self.seestar_path_label.pack(side="left", padx=(0, 10))
         
-        seestar_button = ctk.CTkButton(seestar_button_frame, text="Browse", command=self.select_seestar_dir, width=100)
+        seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
         seestar_button.pack(side="right")
         
         # Raw Directory (Target for copy)
@@ -75,7 +75,7 @@ class SeestarApp(ctk.CTk):
         self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="gray")
         self.raw_path_label.pack(side="left", padx=(0, 10))
         
-        raw_button = ctk.CTkButton(raw_button_frame, text="Browse", command=self.select_raw_dir, width=100)
+        raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
         raw_button.pack(side="right")
         
         # Projects Directory
@@ -88,7 +88,7 @@ class SeestarApp(ctk.CTk):
         self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="gray")
         self.projects_path_label.pack(side="left", padx=(0, 10))
         
-        projects_button = ctk.CTkButton(projects_button_frame, text="Browse", command=self.select_projects_dir, width=100)
+        projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
         projects_button.pack(side="right")
         
         # Action Buttons
@@ -97,7 +97,7 @@ class SeestarApp(ctk.CTk):
         
         self.scan_button = ctk.CTkButton(
             action_frame, 
-            text="Scan & Build Projects",
+            text="� Scan & Build Projects",
             command=self.start_scan,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold")
@@ -106,7 +106,7 @@ class SeestarApp(ctk.CTk):
         
         self.analyze_button = ctk.CTkButton(
             action_frame,
-            text="Analyze Existing Projects",
+            text="🪐 Analyze Existing Projects",
             command=self.start_analysis,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold")
@@ -133,17 +133,6 @@ class SeestarApp(ctk.CTk):
         
         # Redirect logging to console
         self.setup_console_logging()
-        
-        # Dashboard Frame
-        dashboard_frame = ctk.CTkFrame(main_frame)
-        dashboard_frame.pack(fill="both", expand=True)
-        
-        dashboard_label = ctk.CTkLabel(dashboard_frame, text="Project Dashboard", font=ctk.CTkFont(size=18, weight="bold"))
-        dashboard_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        # Scrollable frame for project list
-        self.scroll_frame = ctk.CTkScrollableFrame(dashboard_frame)
-        self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
     
     def setup_console_logging(self):
         """Setup custom logging handler to redirect output to console."""
@@ -248,7 +237,6 @@ class SeestarApp(ctk.CTk):
                 self.projects.append(project)
             
             self.after(0, lambda: self.progress_label.configure(text=f"Completed! Built {len(self.projects)} projects"))
-            self.after(0, self.update_dashboard)
             
         except Exception as e:
             logger.error(f"Error during scan: {e}")
@@ -328,49 +316,6 @@ class SeestarApp(ctk.CTk):
     def show_analysis_window(self, results):
         """Show analysis results in a new window."""
         AnalysisWindow(self, results)
-    
-    def update_dashboard(self):
-        """Update the dashboard with project metrics."""
-        # Clear existing widgets
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
-        
-        for project in self.projects:
-            self.create_project_card(project)
-    
-    def create_project_card(self, project):
-        """Create a card for a project."""
-        card = ctk.CTkFrame(self.scroll_frame)
-        card.pack(fill="x", pady=5)
-        
-        # Project name
-        name_label = ctk.CTkLabel(card, text=project.name, font=ctk.CTkFont(size=16, weight="bold"))
-        name_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        # Frame counts
-        metrics = project.metrics
-        counts_text = (
-            f"Lights: {metrics.total_lights} | "
-            f"Darks: {metrics.total_darks} | "
-            f"Flats: {metrics.total_flats} | "
-            f"Bias: {metrics.total_bias}"
-        )
-        counts_label = ctk.CTkLabel(card, text=counts_text)
-        counts_label.pack(anchor="w", padx=10, pady=2)
-        
-        # Integration time
-        hours = int(metrics.total_integration_seconds // 3600)
-        minutes = int((metrics.total_integration_seconds % 3600) // 60)
-        seconds = int(metrics.total_integration_seconds % 60)
-        time_text = f"Integration: {hours}h {minutes}m {seconds}s"
-        time_label = ctk.CTkLabel(card, text=time_text)
-        time_label.pack(anchor="w", padx=10, pady=2)
-        
-        # File stats
-        size_mb = metrics.total_disk_usage / (1024 * 1024)
-        stats_text = f"Files: {metrics.total_file_count} | Size: {size_mb:.1f} MB"
-        stats_label = ctk.CTkLabel(card, text=stats_text, text_color="gray")
-        stats_label.pack(anchor="w", padx=10, pady=(2, 10))
 
 
 class AnalysisWindow(ctk.CTkToplevel):
@@ -379,7 +324,7 @@ class AnalysisWindow(ctk.CTkToplevel):
     def __init__(self, parent, results):
         super().__init__(parent)
         
-        self.title("Project Analysis")
+        self.title("Seestar FITS Organizer - Analysis")
         self.geometry("1400x900")
         
         self.results = results
@@ -403,7 +348,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         # Title
         title_label = ctk.CTkLabel(
             main_frame,
-            text="Project Analysis Results",
+            text="Seestar FITS Organizer - Analysis",
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title_label.pack(pady=(0, 20))
@@ -587,8 +532,9 @@ class AnalysisWindow(ctk.CTkToplevel):
             grouped_locations = []
             used_indices = set()
             
-            # 100 yards ≈ 0.000824 degrees
-            threshold = 0.000824
+            # Use a very forgiving threshold to account for GPS drift and coordinate precision
+            # 0.005 degrees ≈ 600 yards
+            threshold = 0.005
             
             for i, (site1, lat1, lon1, objects1) in enumerate(location_data):
                 if i in used_indices:
@@ -653,9 +599,9 @@ class AnalysisWindow(ctk.CTkToplevel):
                 # Check for saved tag
                 tag = self.location_tags.get_tag(str(avg_lat), str(avg_lon))
                 if tag:
-                    display_name = f"📍 {tag['name']}"
+                    display_name = f"⭐ {tag['name']}"
                 else:
-                    display_name = f"📍 Location {idx}"
+                    display_name = f"⭐ Location {idx}"
                 
                 location_label = ctk.CTkLabel(
                     header_frame,
@@ -973,7 +919,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             for exp, count in sorted(project['lights_by_exposure'].items()):
                 exp_textbox = ctk.CTkTextbox(summary_content, height=25)
                 exp_textbox.pack(fill="x", padx=10, pady=1)
-                exp_textbox.insert("1.0", f"  {exp}s: {count} frames")
+                exp_textbox.insert("1.0", f"{exp}s: {count} frames")
                 exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
         
         # Exposure breakdown for darks
@@ -984,7 +930,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             for exp, count in sorted(project['darks_by_exposure'].items()):
                 exp_textbox = ctk.CTkTextbox(summary_content, height=25)
                 exp_textbox.pack(fill="x", padx=10, pady=1)
-                exp_textbox.insert("1.0", f"  {exp}s: {count} frames")
+                exp_textbox.insert("1.0", f"{exp}s: {count} frames")
                 exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
         
         # Integration time
@@ -1044,7 +990,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         # Open in File Explorer button
         open_button = ctk.CTkButton(
             summary_content,
-            text="📁 Open in File Explorer",
+            text="� Open in File Explorer",
             font=ctk.CTkFont(size=12),
             height=32,
             command=lambda: self.open_file_explorer(project['path'])
@@ -1083,7 +1029,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     if tag:
                         location_textbox = ctk.CTkTextbox(session_content, height=25)
                         location_textbox.pack(fill="x", padx=10, pady=(0, 2))
-                        location_textbox.insert("1.0", f"📍 {tag['name']}")
+                        location_textbox.insert("1.0", f"⭐ {tag['name']}")
                         location_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
                     
                     # Site
@@ -1166,7 +1112,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     for exp, count in sorted(lights_by_exposure.items()):
                         exp_textbox = ctk.CTkTextbox(session_content, height=25)
                         exp_textbox.pack(fill="x", padx=10, pady=1)
-                        exp_textbox.insert("1.0", f"  {exp}s: {count} frames")
+                        exp_textbox.insert("1.0", f"{exp}s: {count} frames")
                         exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
                 
                 if exposures:
