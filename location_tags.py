@@ -19,10 +19,22 @@ class LocationTags:
         """Initialize location tags storage.
         
         Args:
-            storage_path: Path to the JSON file for storing tags. Defaults to location_tags.json in the same directory.
+            storage_path: Path to the JSON file for storing tags. Defaults to location_tags.json in the executable directory.
         """
         if storage_path is None:
-            storage_path = Path(__file__).parent / "location_tags.json"
+            # Try to use the directory of the executable (if bundled) or the script
+            try:
+                # If running as a PyInstaller bundle
+                import sys
+                if getattr(sys, 'frozen', False):
+                    # Running as bundled executable
+                    storage_path = Path(sys.executable).parent / "location_tags.json"
+                else:
+                    # Running as script
+                    storage_path = Path(__file__).parent / "location_tags.json"
+            except Exception:
+                # Fallback to current directory
+                storage_path = Path.cwd() / "location_tags.json"
         
         self.storage_path = storage_path
         self.tags: Dict[str, Dict] = {}  # {(lat, lon): {name, notes, created_at}}

@@ -17,7 +17,13 @@ A Windows desktop application for processing astrophotography data from Seestar 
 
 ## Installation
 
-### Virtual Environment (Recommended but Optional)
+### Option 1: Standalone Executable (Recommended for Sharing)
+
+Download the pre-built executable from the [Releases](https://github.com/Gyros1981/seestar-fits-organizer/releases) section. No Python installation required - just run the `.exe` file.
+
+### Option 2: Build from Source
+
+#### Virtual Environment (Recommended but Optional)
 
 A virtual environment keeps your project dependencies isolated from other Python projects on your system, preventing version conflicts. However, for a simple app like this, you can skip it if you prefer a simpler setup.
 
@@ -31,7 +37,7 @@ A virtual environment keeps your project dependencies isolated from other Python
 - Works fine for a single project
 - Dependencies install globally
 
-### Quick Install
+#### Quick Install
 
 1. Clone the repository:
    ```cmd
@@ -51,6 +57,27 @@ A virtual environment keeps your project dependencies isolated from other Python
    ```cmd
    pip install -r requirements.txt
    ```
+
+#### Building the Executable
+
+To create a standalone `.exe` file for sharing:
+
+1. Install PyInstaller (included in requirements.txt):
+   ```cmd
+   pip install pyinstaller
+   ```
+
+2. Run the build script:
+   ```cmd
+   build_exe.bat
+   ```
+
+Or manually:
+   ```cmd
+   pyinstaller --onefile --windowed --name "Seestar FITS Organizer" main.py
+   ```
+
+The executable will be created in the `dist` folder.
 
 ## Usage
 
