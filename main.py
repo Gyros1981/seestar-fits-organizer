@@ -9,6 +9,7 @@ from pathlib import Path
 import threading
 from project_builder import ProjectBuilder
 from location_tags import LocationTags
+from app_settings import AppSettings
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,9 @@ class SeestarApp(ctk.CTk):
         self.projects_dir = None
         self.projects = []
         
+        # Initialize settings
+        self.settings = AppSettings()
+        
         self.setup_ui()
     
     def setup_ui(self):
@@ -40,13 +44,26 @@ class SeestarApp(ctk.CTk):
         main_frame = ctk.CTkFrame(self)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Title
+        # Title with settings button
+        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        title_frame.pack(fill="x", pady=(0, 20))
+        
         title_label = ctk.CTkLabel(
-            main_frame, 
+            title_frame, 
             text="Seestar FITS Organizer",
             font=ctk.CTkFont(size=24, weight="bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(side="left")
+        
+        settings_button = ctk.CTkButton(
+            title_frame,
+            text="⚙️",
+            font=ctk.CTkFont(size=20),
+            width=40,
+            height=40,
+            command=self.open_settings
+        )
+        settings_button.pack(side="right")
         
         # Folder Selection Frame
         folder_frame = ctk.CTkFrame(main_frame)
@@ -318,6 +335,235 @@ class SeestarApp(ctk.CTk):
         AnalysisWindow(self, results)
 
 
+    def open_settings(self):
+        """Open the settings dialog."""
+        # Create a LocationTags instance for import/export
+        location_tags = LocationTags()
+        SettingsWindow(self, self.settings, location_tags)
+
+
+class SettingsWindow(ctk.CTkToplevel):
+    """Window for application settings."""
+    
+    def __init__(self, parent, settings, location_tags):
+        super().__init__(parent)
+        
+        self.settings = settings
+        self.parent = parent
+        self.location_tags = location_tags
+        
+        self.title("Settings")
+        self.geometry("500x600")
+        self.transient(parent)
+        self.grab_set()
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Setup the settings UI."""
+        # Main container
+        main_frame = ctk.CTkFrame(self)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            main_frame,
+            text="Settings",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.pack(pady=(0, 20))
+        
+        # Location Settings Section
+        location_frame = ctk.CTkFrame(main_frame)
+        location_frame.pack(fill="x", pady=(0, 15))
+        
+        location_label = ctk.CTkLabel(
+            location_frame,
+            text="Location Settings",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        location_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Location grouping threshold
+        threshold_label = ctk.CTkLabel(
+            location_frame,
+            text="Location Grouping Threshold (degrees):"
+        )
+        threshold_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.threshold_entry = ctk.CTkEntry(location_frame)
+        self.threshold_entry.pack(fill="x", padx=10, pady=(0, 5))
+        self.threshold_entry.insert("0", str(self.settings.get_location_threshold()))
+        
+        threshold_help = ctk.CTkLabel(
+            location_frame,
+            text="Locations within this distance will be grouped together (default: 0.005 ≈ 600 yards)",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Timezone Settings Section
+        timezone_frame = ctk.CTkFrame(main_frame)
+        timezone_frame.pack(fill="x", pady=(0, 15))
+        
+        timezone_label = ctk.CTkLabel(
+            timezone_frame,
+            text="Timezone Settings",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        timezone_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Timezone selection
+        tz_label = ctk.CTkLabel(
+            timezone_frame,
+            text="Display Timezone:"
+        )
+        tz_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.timezone_menu = ctk.CTkOptionMenu(
+            timezone_frame,
+            values=["UTC", "PST (UTC-8)", "EST (UTC-5)", "Local"],
+            command=None
+        )
+        self.timezone_menu.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Map timezone setting to menu value
+        tz_setting = self.settings.get_timezone()
+        if tz_setting == "UTC":
+            self.timezone_menu.set("UTC")
+        elif tz_setting == "EST":
+            self.timezone_menu.set("EST (UTC-5)")
+        elif tz_setting == "Local":
+            self.timezone_menu.set("Local")
+        else:
+            self.timezone_menu.set("PST (UTC-8)")
+        
+        # Location Tags Section
+        tags_frame = ctk.CTkFrame(main_frame)
+        tags_frame.pack(fill="x", pady=(0, 15))
+        
+        tags_label = ctk.CTkLabel(
+            tags_frame,
+            text="Location Tags",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        tags_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Import/Export buttons
+        button_frame = ctk.CTkFrame(tags_frame, fg_color="transparent")
+        button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        import_button = ctk.CTkButton(
+            button_frame,
+            text="📥 Import Tags",
+            command=self.import_tags,
+            height=35
+        )
+        import_button.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        
+        export_button = ctk.CTkButton(
+            button_frame,
+            text="📤 Export Tags",
+            command=self.export_tags,
+            height=35
+        )
+        export_button.pack(side="right", fill="x", expand=True, padx=(5, 0))
+        
+        # Save/Cancel buttons
+        action_frame = ctk.CTkFrame(main_frame)
+        action_frame.pack(fill="x", pady=(20, 0))
+        
+        save_button = ctk.CTkButton(
+            action_frame,
+            text="Save",
+            fg_color="#1E90FF",
+            hover_color="#4169E1",
+            command=self.save_settings,
+            height=40
+        )
+        save_button.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        
+        cancel_button = ctk.CTkButton(
+            action_frame,
+            text="Cancel",
+            command=self.destroy,
+            height=40
+        )
+        cancel_button.pack(side="right", fill="x", expand=True, padx=(5, 0))
+    
+    def import_tags(self):
+        """Import location tags from a JSON file."""
+        from tkinter import filedialog
+        import json
+        
+        file_path = filedialog.askopenfilename(
+            title="Import Location Tags",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    # Import tags to location_tags system
+                    for key, value in data.items():
+                        try:
+                            lat, lon = key.split(',')
+                            self.location_tags.set_tag(lat, value['name'], value.get('notes', ''))
+                        except (ValueError, KeyError):
+                            continue
+                    messagebox.showinfo("Success", f"Imported {len(data)} location tags")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import tags: {str(e)}")
+    
+    def export_tags(self):
+        """Export location tags to a JSON file."""
+        from tkinter import filedialog
+        import json
+        
+        file_path = filedialog.asksaveasfilename(
+            title="Export Location Tags",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            try:
+                # Export tags from location_tags system
+                data = self.location_tags.get_all_tags()
+                with open(file_path, 'w') as f:
+                    json.dump(data, f, indent=2)
+                messagebox.showinfo("Success", f"Exported {len(data)} location tags to {file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export tags: {str(e)}")
+    
+    def save_settings(self):
+        """Save settings and close dialog."""
+        try:
+            # Save location threshold
+            threshold = float(self.threshold_entry.get())
+            self.settings.set_location_threshold(threshold)
+            
+            # Save timezone
+            tz_value = self.timezone_menu.get()
+            if "UTC" in tz_value:
+                self.settings.set_timezone("UTC")
+            elif "EST" in tz_value:
+                self.settings.set_timezone("EST")
+            elif "Local" in tz_value:
+                self.settings.set_timezone("Local")
+            else:
+                self.settings.set_timezone("PST")
+            
+            messagebox.showinfo("Success", "Settings saved successfully!")
+            self.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Invalid threshold value. Please enter a number.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {str(e)}")
+
+
 class AnalysisWindow(ctk.CTkToplevel):
     """Window for displaying project analysis results."""
     
@@ -328,6 +574,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.geometry("1400x900")
         
         self.results = results
+        self.settings = parent.settings
         
         # Initialize location tags storage
         self.location_tags = LocationTags()
@@ -533,8 +780,8 @@ class AnalysisWindow(ctk.CTkToplevel):
             used_indices = set()
             
             # Use a very forgiving threshold to account for GPS drift and coordinate precision
-            # 0.005 degrees ≈ 600 yards
-            threshold = 0.005
+            # Get threshold from settings (default: 0.005 degrees ≈ 600 yards)
+            threshold = self.settings.get_location_threshold()
             
             for i, (site1, lat1, lon1, objects1) in enumerate(location_data):
                 if i in used_indices:
@@ -845,16 +1092,33 @@ class AnalysisWindow(ctk.CTkToplevel):
         cancel_button.pack(side="right")
     
     def _format_datetime(self, datetime_str: str) -> str:
-        """Format datetime string to human-readable format in PST."""
+        """Format datetime string to human-readable format using configured timezone."""
         try:
             from datetime import datetime, timezone, timedelta
             dt = datetime.fromisoformat(datetime_str)
-            # Convert UTC to PST (UTC-8)
-            pst = timezone(timedelta(hours=-8))
+            
+            # Get timezone from settings
+            tz_setting = self.settings.get_timezone()
+            
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-            dt_pst = dt.astimezone(pst)
-            return dt_pst.strftime("%Y-%m-%d %I:%M %p")
+            
+            if tz_setting == "UTC":
+                # Keep as UTC
+                dt_final = dt
+            elif tz_setting == "EST":
+                # Convert to EST (UTC-5)
+                est = timezone(timedelta(hours=-5))
+                dt_final = dt.astimezone(est)
+            elif tz_setting == "Local":
+                # Convert to local timezone
+                dt_final = dt.astimezone()
+            else:
+                # Default to PST (UTC-8)
+                pst = timezone(timedelta(hours=-8))
+                dt_final = dt.astimezone(pst)
+            
+            return dt_final.strftime("%Y-%m-%d %I:%M %p")
         except Exception:
             return datetime_str
     
@@ -869,12 +1133,6 @@ class AnalysisWindow(ctk.CTkToplevel):
         
         # Track expandable sections for accordion behavior
         self.expandable_sections = []
-        
-        # Project name
-        name_textbox = ctk.CTkTextbox(self.details_scroll, height=40)
-        name_textbox.pack(fill="x", padx=10, pady=(10, 5))
-        name_textbox.insert("1.0", project['name'])
-        name_textbox.configure(state="disabled", font=ctk.CTkFont(size=20, weight="bold"))
         
         # Project summary (collapsible)
         summary_frame = ctk.CTkFrame(self.details_scroll)
