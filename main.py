@@ -29,6 +29,8 @@ class SeestarApp(ctk.CTk):
         self.raw_dir = None
         self.projects_dir = None
         self.projects = []
+        self.workflow_mode = "intermediate"  # "direct" or "intermediate"
+        self.workflow_var = ctk.StringVar(value="intermediate")
         
         # Initialize settings
         self.settings = AppSettings()
@@ -65,11 +67,50 @@ class SeestarApp(ctk.CTk):
         )
         settings_button.pack(side="right")
         
+        # Workflow Selection
+        workflow_frame = ctk.CTkFrame(main_frame)
+        workflow_frame.pack(fill="x", pady=(0, 20))
+        
+        workflow_label = ctk.CTkLabel(workflow_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
+        workflow_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        workflow_button_frame = ctk.CTkFrame(workflow_frame, fg_color="transparent")
+        workflow_button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.direct_radio = ctk.CTkRadioButton(
+            workflow_button_frame,
+            text="Direct (Seestar → Projects)",
+            variable=self.workflow_var,
+            value="direct",
+            command=self.toggle_workflow
+        )
+        self.direct_radio.pack(side="left", padx=(0, 20))
+        
+        self.intermediate_radio = ctk.CTkRadioButton(
+            workflow_button_frame,
+            text="Intermediate (Seestar → Raw → Projects)",
+            variable=self.workflow_var,
+            value="intermediate",
+            command=self.toggle_workflow
+        )
+        self.intermediate_radio.pack(side="left")
+        self.intermediate_radio.select()  # Default to intermediate
+        
+        # Workflow explanation
+        self.workflow_explanation = ctk.CTkLabel(
+            workflow_frame,
+            text="Intermediate: First copy from Seestar device to Raw directory, then organize into project folders.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            wraplength=900
+        )
+        self.workflow_explanation.pack(anchor="w", padx=10, pady=(0, 10))
+        
         # Folder Selection Frame
         folder_frame = ctk.CTkFrame(main_frame)
         folder_frame.pack(fill="x", pady=(0, 20))
         
-        # Seestar Device Directory
+        # Seestar Device Directory (common to both workflows)
         seestar_label = ctk.CTkLabel(folder_frame, text="Seestar Device Location:", font=ctk.CTkFont(weight="bold"))
         seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
         
@@ -82,9 +123,9 @@ class SeestarApp(ctk.CTk):
         seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
         seestar_button.pack(side="right")
         
-        # Raw Directory (Target for copy)
-        raw_label = ctk.CTkLabel(folder_frame, text="Raw Directory (Target):", font=ctk.CTkFont(weight="bold"))
-        raw_label.pack(anchor="w", padx=10, pady=(10, 0))
+        # Raw Directory (only for intermediate workflow)
+        self.raw_label = ctk.CTkLabel(folder_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
+        self.raw_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         raw_button_frame = ctk.CTkFrame(folder_frame, fg_color="transparent")
         raw_button_frame.pack(fill="x", padx=10, pady=(5, 10))
@@ -95,7 +136,7 @@ class SeestarApp(ctk.CTk):
         raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
         raw_button.pack(side="right")
         
-        # Projects Directory
+        # Projects Directory (common to both workflows)
         projects_label = ctk.CTkLabel(folder_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
         projects_label.pack(anchor="w", padx=10, pady=(10, 0))
         
@@ -201,9 +242,15 @@ class SeestarApp(ctk.CTk):
     
     def start_scan(self):
         """Start scanning and building projects in a separate thread."""
-        if not self.seestar_dir or not self.raw_dir or not self.projects_dir:
-            messagebox.showerror("Error", "Please select all three directories (Seestar, Raw, Projects)")
-            return
+        # Validate directories based on workflow mode
+        if self.workflow_mode == "direct":
+            if not self.seestar_dir or not self.projects_dir:
+                messagebox.showerror("Error", "Please select Seestar and Projects directories")
+                return
+        else:  # intermediate
+            if not self.seestar_dir or not self.raw_dir or not self.projects_dir:
+                messagebox.showerror("Error", "Please select all three directories (Seestar, Raw, Projects)")
+                return
         
         self.scan_button.configure(state="disabled")
         self.progress_label.configure(text="Starting scan...")
@@ -228,19 +275,27 @@ class SeestarApp(ctk.CTk):
     def scan_and_build(self):
         """Scan and build projects."""
         try:
-            # Step 1: Copy from Seestar to Raw directory
-            self.after(0, lambda: self.progress_label.configure(text="Copying from Seestar to Raw..."))
-            self.copy_seestar_to_raw()
+            source_dir = self.raw_dir  # Default to raw_dir for intermediate workflow
             
-            # Step 2: Build projects from Raw to Projects
+            if self.workflow_mode == "intermediate":
+                # Step 1: Copy from Seestar to Raw directory
+                self.after(0, lambda: self.progress_label.configure(text="Copying from Seestar to Raw..."))
+                self.copy_seestar_to_raw()
+                source_dir = self.raw_dir
+            else:
+                # Direct workflow: use Seestar directory as source
+                source_dir = self.seestar_dir
+                self.after(0, lambda: self.progress_label.configure(text="Building projects from Seestar..."))
+            
+            # Step 2: Build projects from source to Projects
             self.after(0, lambda: self.progress_label.configure(text="Building projects..."))
-            builder = ProjectBuilder(self.raw_dir, self.projects_dir)
+            builder = ProjectBuilder(source_dir, self.projects_dir)
             
             folders = builder.scan_raw_folders()
             total_projects = len(folders)
             
             if total_projects == 0:
-                self.after(0, lambda: self.progress_label.configure(text="No *_subs folders found in Raw"))
+                self.after(0, lambda: self.progress_label.configure(text="No *_subs folders found in source"))
                 self.after(0, lambda: self.scan_button.configure(state="normal"))
                 return
             
@@ -340,6 +395,23 @@ class SeestarApp(ctk.CTk):
         # Create a LocationTags instance for import/export
         location_tags = LocationTags()
         SettingsWindow(self, self.settings, location_tags)
+    
+    def toggle_workflow(self):
+        """Toggle between direct and intermediate workflow."""
+        if self.workflow_var.get() == "direct":
+            self.workflow_mode = "direct"
+            self.raw_label.pack_forget()
+            self.raw_path_label.master.pack_forget()
+            self.workflow_explanation.configure(
+                text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory)."
+            )
+        else:
+            self.workflow_mode = "intermediate"
+            self.raw_label.pack(anchor="w", padx=10, pady=(10, 0))
+            self.raw_path_label.master.pack(fill="x", padx=10, pady=(5, 10))
+            self.workflow_explanation.configure(
+                text="Intermediate: First copy from Seestar device to Raw directory, then organize into project folders."
+            )
 
 
 class SettingsWindow(ctk.CTkToplevel):
