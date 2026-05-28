@@ -6,7 +6,6 @@ Analyzes existing projects and generates aggregate statistics.
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
-from collections import defaultdict
 import logging
 from .fits_metadata import FitsMetadata
 from .frame_classifier import FrameClassifier

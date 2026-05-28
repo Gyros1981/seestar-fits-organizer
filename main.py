@@ -18,7 +18,6 @@ from pathlib import Path
 import threading
 import logging
 import shutil
-import os
 
 # Import core business logic
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
@@ -58,6 +57,10 @@ class SeestarApp(ctk.CTk):
         
         self.setup_ui()
         
+        # Set fullscreen/maximized window state
+        self.state('zoomed')  # Windows maximized
+        # Alternative: self.attributes('-fullscreen', True) for true fullscreen
+        
         # Initialize workflow state (raw section is not packed by default for direct mode)
         pass  # raw_section_frame is not packed initially
     
@@ -82,7 +85,7 @@ class SeestarApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
-        # Main container
+        # Main container - horizontal split
         main_frame = ctk.CTkFrame(self)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
@@ -107,8 +110,18 @@ class SeestarApp(ctk.CTk):
         )
         self.settings_button.pack(side="right")
         
+        # Content frame - horizontal split: left (controls) and right (console)
+        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, pady=(0, 20))
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(1, weight=2)
+        
+        # Left panel - Controls
+        left_panel = ctk.CTkFrame(content_frame)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
         # Scan & Build Projects Section
-        scan_build_frame = ctk.CTkFrame(main_frame)
+        scan_build_frame = ctk.CTkFrame(left_panel)
         scan_build_frame.pack(fill="x", pady=(0, 20))
         
         scan_build_label = ctk.CTkLabel(scan_build_frame, text="Scan & Build Projects", font=ctk.CTkFont(size=16, weight="bold"))
@@ -202,7 +215,7 @@ class SeestarApp(ctk.CTk):
         self.scan_button.pack(fill="x", padx=10, pady=(10, 10))
         
         # Analyze Projects Section
-        analyze_frame = ctk.CTkFrame(main_frame)
+        analyze_frame = ctk.CTkFrame(left_panel)
         analyze_frame.pack(fill="x", pady=(0, 20))
         
         analyze_label = ctk.CTkLabel(analyze_frame, text="Analyze Existing Projects", font=ctk.CTkFont(size=16, weight="bold"))
@@ -232,20 +245,20 @@ class SeestarApp(ctk.CTk):
         self.analyze_button.pack(fill="x", padx=10, pady=(0, 10))
         
         # Progress Frame
-        progress_frame = ctk.CTkFrame(main_frame)
+        progress_frame = ctk.CTkFrame(left_panel)
         progress_frame.pack(fill="x", pady=(0, 20))
         
         self.progress_label = ctk.CTkLabel(progress_frame, text="Ready", text_color="gray")
         self.progress_label.pack(anchor="w", padx=10, pady=(10, 10))
         
-        # Console Output Frame
-        console_frame = ctk.CTkFrame(main_frame)
-        console_frame.pack(fill="both", expand=True, pady=(0, 20))
+        # Right panel - Console Output
+        right_panel = ctk.CTkFrame(content_frame)
+        right_panel.grid(row=0, column=1, sticky="nsew")
         
-        console_label = ctk.CTkLabel(console_frame, text="Console Output", font=ctk.CTkFont(size=14, weight="bold"))
+        console_label = ctk.CTkLabel(right_panel, text="Console Output", font=ctk.CTkFont(size=14, weight="bold"))
         console_label.pack(anchor="w", padx=10, pady=(10, 5))
         
-        self.console_text = ctk.CTkTextbox(console_frame, height=150)
+        self.console_text = ctk.CTkTextbox(right_panel)
         self.console_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.console_text.configure(state="disabled")
         

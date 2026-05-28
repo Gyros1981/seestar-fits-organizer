@@ -3,7 +3,6 @@ Frame Classification Module
 Classifies FITS files as LIGHT, DARK, FLAT, or BIAS.
 """
 
-from pathlib import Path
 from typing import Literal
 from .fits_metadata import FitsMetadata
 import logging
