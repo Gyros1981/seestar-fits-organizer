@@ -29,13 +29,17 @@ class SeestarApp(ctk.CTk):
         self.raw_dir = None
         self.projects_dir = None
         self.projects = []
-        self.workflow_mode = "intermediate"  # "direct" or "intermediate"
-        self.workflow_var = ctk.StringVar(value="intermediate")
+        self.workflow_mode = "direct"  # "direct" or "intermediate"
+        self.workflow_var = ctk.StringVar(value="direct")
         
         # Initialize settings
         self.settings = AppSettings()
         
         self.setup_ui()
+        
+        # Initialize workflow state (hide raw directory for direct mode)
+        self.raw_label.pack_forget()
+        self.raw_path_label.master.pack_forget()
     
     def setup_ui(self):
         """Setup the user interface."""
@@ -94,12 +98,12 @@ class SeestarApp(ctk.CTk):
             command=self.toggle_workflow
         )
         self.intermediate_radio.pack(side="left")
-        self.intermediate_radio.select()  # Default to intermediate
+        self.direct_radio.select()  # Default to direct
         
         # Workflow explanation
         self.workflow_explanation = ctk.CTkLabel(
             workflow_frame,
-            text="Intermediate: First copy from Seestar device to Raw directory, then organize into project folders.",
+            text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory).",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             wraplength=900
@@ -111,7 +115,7 @@ class SeestarApp(ctk.CTk):
         folder_frame.pack(fill="x", pady=(0, 20))
         
         # Seestar Device Directory (common to both workflows)
-        seestar_label = ctk.CTkLabel(folder_frame, text="Seestar Device Location:", font=ctk.CTkFont(weight="bold"))
+        seestar_label = ctk.CTkLabel(folder_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
         seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         seestar_button_frame = ctk.CTkFrame(folder_frame, fg_color="transparent")
@@ -218,7 +222,7 @@ class SeestarApp(ctk.CTk):
     
     def select_seestar_dir(self):
         """Select Seestar device directory."""
-        directory = filedialog.askdirectory(title="Select Seestar Device Location")
+        directory = filedialog.askdirectory(title="Select Seestar MyWork Directory")
         if directory:
             self.seestar_dir = Path(directory)
             self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
@@ -400,6 +404,7 @@ class SeestarApp(ctk.CTk):
         """Toggle between direct and intermediate workflow."""
         if self.workflow_var.get() == "direct":
             self.workflow_mode = "direct"
+            # Hide intermediate-specific elements
             self.raw_label.pack_forget()
             self.raw_path_label.master.pack_forget()
             self.workflow_explanation.configure(
@@ -407,8 +412,10 @@ class SeestarApp(ctk.CTk):
             )
         else:
             self.workflow_mode = "intermediate"
-            self.raw_label.pack(anchor="w", padx=10, pady=(10, 0))
-            self.raw_path_label.master.pack(fill="x", padx=10, pady=(5, 10))
+            # Show intermediate-specific elements in correct order
+            # Raw directory should be after Seestar, before Projects
+            self.raw_label.pack(anchor="w", padx=10, pady=(10, 0), after=self.seestar_path_label.master)
+            self.raw_path_label.master.pack(fill="x", padx=10, pady=(5, 10), after=self.raw_label)
             self.workflow_explanation.configure(
                 text="Intermediate: First copy from Seestar device to Raw directory, then organize into project folders."
             )
