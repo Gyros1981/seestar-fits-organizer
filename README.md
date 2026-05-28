@@ -136,3 +136,17 @@ Projects/
 - All processing is deterministic and repeatable
 - FITS metadata is the primary source of truth
 - Handles missing or partial metadata gracefully
+
+## Legal
+
+**IMPORTANT:** Please review the following legal documents before using this software:
+
+- [Terms of Service](TERMS_OF_SERVICE.md) - License, data handling, and usage terms
+- [Disclaimer](DISCLAIMER.md) - Warranties, liability, and risk disclaimers
+
+**Key Points:**
+- Software is provided "as is" without warranty
+- Always backup your data before use
+- Not affiliated with Seestar or its parent company
+- Location data is stored locally only
+- No data is transmitted to external servers
