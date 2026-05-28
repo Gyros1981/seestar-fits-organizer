@@ -665,19 +665,159 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.attributes('-topmost', True)
         self.after(100, lambda: self.attributes('-topmost', False))
     
+    def export_to_csv(self):
+        """Export analysis data to CSV file."""
+        from tkinter import filedialog
+        import csv
+        from datetime import datetime
+        
+        # Prompt for save location
+        file_path = filedialog.asksaveasfilename(
+            title="Export Analysis to CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialfile=f"seestar_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Write project summary section
+                writer.writerow(['PROJECT SUMMARY'])
+                writer.writerow(['Project Name', 'Total Lights', 'Total Darks', 'Total Flats', 'Total Bias', 
+                               'Integration Time (hrs)', 'Total Integration (sec)', 'Session Count'])
+                
+                for project in self.results['projects']:
+                    project_name = project.get('name', 'Unknown')
+                    total_lights = project.get('lights', 0)
+                    total_darks = project.get('darks', 0)
+                    total_flats = project.get('flats', 0)
+                    total_bias = project.get('bias', 0)
+                    total_integration_sec = project.get('integration_seconds', 0)
+                    integration_hrs = total_integration_sec / 3600 if total_integration_sec else 0
+                    session_count = len(project.get('sessions', []))
+                    
+                    writer.writerow([
+                        project_name, total_lights, total_darks, total_flats, total_bias,
+                        f"{integration_hrs:.2f}", total_integration_sec, session_count
+                    ])
+                
+                writer.writerow([])  # Empty row separator
+                
+                # Write session details section
+                writer.writerow(['SESSION DETAILS'])
+                writer.writerow(['Project Name', 'Session Start', 'Session End', 'Duration (hrs)',
+                               'Location Name', 'Location (Lat, Lon)', 'Lights', 'Darks', 'Flats', 'Bias',
+                               'Integration Time (hrs)', 'Exposures'])
+                
+                for project in self.results['projects']:
+                    project_name = project.get('name', 'Unknown')
+                    sessions = project.get('sessions', [])
+                    
+                    for session in sessions:
+                        # Sessions are tuples: (object, start, end, lights, integration_seconds, exposures, lights_by_exposure)
+                        obj_name = session[0] if len(session) > 0 else 'N/A'
+                        session_start = session[1] if len(session) > 1 else 'N/A'
+                        session_end = session[2] if len(session) > 2 else 'N/A'
+                        lights = session[3] if len(session) > 3 else 0
+                        integration_sec = session[4] if len(session) > 4 else 0
+                        exposures = session[5] if len(session) > 5 else []
+                        lights_by_exposure = session[6] if len(session) > 6 else {}
+                        
+                        # Calculate duration
+                        duration_hrs = 0
+                        if session_start != 'N/A' and session_end != 'N/A':
+                            try:
+                                from datetime import datetime
+                                start_dt = datetime.fromisoformat(session_start)
+                                end_dt = datetime.fromisoformat(session_end)
+                                duration_hrs = (end_dt - start_dt).total_seconds() / 3600
+                            except:
+                                pass
+                        
+                        # Get location from project level
+                        location = {}
+                        lat = project.get('latitude', 'N/A')
+                        lon = project.get('longitude', 'N/A')
+                        location_str = f"{lat}, {lon}" if lat != 'N/A' and lon != 'N/A' else 'N/A'
+                        
+                        # Look up location tag
+                        location_name = 'N/A'
+                        if lat != 'N/A' and lon != 'N/A':
+                            tag = self.location_tags.get_tag(lat, lon)
+                            if tag and tag.get('name'):
+                                location_name = tag['name']
+                        
+                        integration_hrs = integration_sec / 3600 if integration_sec else 0
+                        
+                        # Format exposures
+                        exposure_str = ', '.join([f"{exp}s ({count})" for exp, count in lights_by_exposure.items()])
+                        
+                        # Format dates
+                        if session_start != 'N/A':
+                            session_start = self._format_datetime(session_start)
+                        if session_end != 'N/A':
+                            session_end = self._format_datetime(session_end)
+                        
+                        writer.writerow([
+                            project_name, session_start, session_end, f"{duration_hrs:.2f}",
+                            location_name, location_str, lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
+                            f"{integration_hrs:.2f}", exposure_str
+                        ])
+                
+                writer.writerow([])  # Empty row separator
+                
+                # Write aggregate statistics
+                writer.writerow(['AGGREGATE STATISTICS'])
+                writer.writerow(['Total Projects', self.results['total_projects']])
+                writer.writerow(['Total Lights', self.results['total_lights']])
+                writer.writerow(['Total Darks', self.results['total_darks']])
+                writer.writerow(['Total Flats', self.results['total_flats']])
+                writer.writerow(['Total Bias', self.results['total_bias']])
+                writer.writerow(['Total Integration (hrs)', f"{self.results['total_integration_hours']:.2f}"])
+                
+                # Calculate total sessions from project data
+                total_sessions = sum(len(project.get('sessions', [])) for project in self.results['projects'])
+                writer.writerow(['Total Sessions', total_sessions])
+            
+            messagebox.showinfo("Success", f"Analysis exported to:\n{file_path}")
+            logger.info(f"Exported analysis to CSV: {file_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export CSV: {str(e)}")
+            logger.error(f"CSV export error: {e}")
+    
     def setup_ui(self):
         """Setup the analysis window UI."""
         # Main container
         main_frame = ctk.CTkFrame(self)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Title
+        # Header with title and export button
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+        
         title_label = ctk.CTkLabel(
-            main_frame,
+            header_frame,
             text="Seestar FITS Organizer - Analysis",
             font=ctk.CTkFont(size=24, weight="bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(side="left")
+        
+        export_button = ctk.CTkButton(
+            header_frame,
+            text="📥 Export to CSV",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            height=40,
+            fg_color="#1E90FF",
+            hover_color="#4169E1",
+            command=self.export_to_csv
+        )
+        export_button.pack(side="right")
         
         # Check if no projects found
         if self.results['total_projects'] == 0:
