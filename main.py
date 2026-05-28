@@ -165,6 +165,144 @@ class DisclaimerWindow(ctk.CTkToplevel):
         self.destroy()
 
 
+class FolderSelectionWindow(ctk.CTkToplevel):
+    """Window for selecting which folders to process."""
+    
+    def __init__(self, parent, folders):
+        """
+        Initialize the folder selection window.
+        
+        Args:
+            parent: Parent window
+            folders: List of Path objects representing discovered folders
+        """
+        super().__init__(parent)
+        
+        self.parent = parent
+        self.folders = folders
+        self.selected_folders = []
+        self.result = None
+        
+        self.title("Select Folders to Process")
+        self.geometry("500x600")
+        self.transient(parent)
+        self.grab_set()
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Setup the folder selection UI."""
+        # Main container
+        main_frame = ctk.CTkFrame(self)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            main_frame,
+            text="📁 Select Folders to Process",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.pack(pady=(0, 10))
+        
+        # Description
+        desc_label = ctk.CTkLabel(
+            main_frame,
+            text=f"Found {len(self.folders)} folder(s). Select which ones to process:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray"
+        )
+        desc_label.pack(anchor="w", pady=(0, 10))
+        
+        # Select All / Deselect All buttons
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(0, 10))
+        
+        select_all_btn = ctk.CTkButton(
+            button_frame,
+            text="Select All",
+            command=self.select_all,
+            width=100
+        )
+        select_all_btn.pack(side="left", padx=(0, 10))
+        
+        deselect_all_btn = ctk.CTkButton(
+            button_frame,
+            text="Deselect All",
+            command=self.deselect_all,
+            width=100
+        )
+        deselect_all_btn.pack(side="left")
+        
+        # Scrollable frame for checkboxes
+        scroll_frame = ctk.CTkScrollableFrame(main_frame, height=350)
+        scroll_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # Create checkbox for each folder
+        self.checkbox_vars = {}
+        for folder in sorted(self.folders, key=lambda x: x.name.lower()):
+            var = ctk.BooleanVar(value=True)
+            self.checkbox_vars[folder] = var
+            
+            checkbox = ctk.CTkCheckBox(
+                scroll_frame,
+                text=folder.name,
+                variable=var,
+                font=ctk.CTkFont(size=12)
+            )
+            checkbox.pack(anchor="w", pady=2, padx=5)
+        
+        # Action buttons
+        action_frame = ctk.CTkFrame(main_frame)
+        action_frame.pack(fill="x", pady=(10, 0))
+        
+        cancel_btn = ctk.CTkButton(
+            action_frame,
+            text="Cancel",
+            command=self.cancel,
+            height=40
+        )
+        cancel_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        
+        process_btn = ctk.CTkButton(
+            action_frame,
+            text="Process Selected",
+            command=self.process,
+            height=40,
+            fg_color="#1E90FF",
+            hover_color="#4169E1"
+        )
+        process_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
+    
+    def select_all(self):
+        """Select all folders."""
+        for var in self.checkbox_vars.values():
+            var.set(True)
+    
+    def deselect_all(self):
+        """Deselect all folders."""
+        for var in self.checkbox_vars.values():
+            var.set(False)
+    
+    def process(self):
+        """Process selected folders and close dialog."""
+        self.selected_folders = [
+            folder for folder, var in self.checkbox_vars.items()
+            if var.get()
+        ]
+        self.result = "process"
+        self.destroy()
+    
+    def cancel(self):
+        """Cancel and close dialog."""
+        self.result = "cancel"
+        self.selected_folders = []
+        self.destroy()
+    
+    def get_selected_folders(self):
+        """Return the list of selected folders."""
+        return self.selected_folders
+
+
 class SeestarApp(ctk.CTk):
     """Main application window."""
     
@@ -199,6 +337,18 @@ class SeestarApp(ctk.CTk):
         """Show the disclaimer window."""
         DisclaimerWindow(self, self.settings)
     
+    def set_ui_state(self, enabled: bool):
+        """Enable or disable all UI buttons during processing."""
+        state = "normal" if enabled else "disabled"
+        
+        self.scan_button.configure(state=state)
+        self.analyze_button.configure(state=state)
+        self.settings_button.configure(state=state)
+        self.seestar_button.configure(state=state)
+        self.raw_button.configure(state=state)
+        self.projects_button.configure(state=state)
+        self.analyze_projects_button.configure(state=state)
+    
     def setup_ui(self):
         """Setup the user interface."""
         ctk.set_appearance_mode("dark")
@@ -219,7 +369,7 @@ class SeestarApp(ctk.CTk):
         )
         title_label.pack(side="left")
         
-        settings_button = ctk.CTkButton(
+        self.settings_button = ctk.CTkButton(
             title_frame,
             text="⚙️",
             font=ctk.CTkFont(size=20),
@@ -227,7 +377,7 @@ class SeestarApp(ctk.CTk):
             height=40,
             command=self.open_settings
         )
-        settings_button.pack(side="right")
+        self.settings_button.pack(side="right")
         
         # Scan & Build Projects Section
         scan_build_frame = ctk.CTkFrame(main_frame)
@@ -282,8 +432,8 @@ class SeestarApp(ctk.CTk):
         self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="gray")
         self.seestar_path_label.pack(side="left", padx=(0, 10))
         
-        seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
-        seestar_button.pack(side="right")
+        self.seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
+        self.seestar_button.pack(side="right")
         
         # Raw Directory (only for intermediate workflow)
         self.raw_label = ctk.CTkLabel(scan_build_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
@@ -295,8 +445,8 @@ class SeestarApp(ctk.CTk):
         self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="gray")
         self.raw_path_label.pack(side="left", padx=(0, 10))
         
-        raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
-        raw_button.pack(side="right")
+        self.raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
+        self.raw_button.pack(side="right")
         
         # Projects Directory (for scan & build)
         projects_label = ctk.CTkLabel(scan_build_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
@@ -308,8 +458,8 @@ class SeestarApp(ctk.CTk):
         self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="gray")
         self.projects_path_label.pack(side="left", padx=(0, 10))
         
-        projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
-        projects_button.pack(side="right")
+        self.projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
+        self.projects_button.pack(side="right")
         
         # Scan & Build Button
         self.scan_button = ctk.CTkButton(
@@ -338,8 +488,8 @@ class SeestarApp(ctk.CTk):
         self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color="gray")
         self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
         
-        analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100)
-        analyze_projects_button.pack(side="right")
+        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100)
+        self.analyze_projects_button.pack(side="right")
         
         # Analyze Button
         self.analyze_button = ctk.CTkButton(
@@ -440,7 +590,7 @@ class SeestarApp(ctk.CTk):
                 messagebox.showerror("Error", "Please select all three directories (Seestar, Raw, Projects)")
                 return
         
-        self.scan_button.configure(state="disabled")
+        self.set_ui_state(False)
         self.progress_label.configure(text="Starting scan...")
         
         thread = threading.Thread(target=self.scan_and_build)
@@ -453,7 +603,7 @@ class SeestarApp(ctk.CTk):
             messagebox.showerror("Error", "Please select Projects directory for analysis")
             return
         
-        self.analyze_button.configure(state="disabled")
+        self.set_ui_state(False)
         self.progress_label.configure(text="Analyzing projects...")
         
         thread = threading.Thread(target=self.analyze_projects)
@@ -476,21 +626,44 @@ class SeestarApp(ctk.CTk):
                 self.after(0, lambda: self.progress_label.configure(text="Building projects from Seestar..."))
             
             # Step 2: Build projects from source to Projects
-            self.after(0, lambda: self.progress_label.configure(text="Building projects..."))
+            self.after(0, lambda: self.progress_label.configure(text="Discovering folders..."))
             builder = ProjectBuilder(source_dir, self.projects_dir)
             
             folders = builder.scan_raw_folders()
-            total_projects = len(folders)
+            total_folders = len(folders)
             
-            if total_projects == 0:
+            if total_folders == 0:
                 self.after(0, lambda: self.progress_label.configure(text="No *_subs folders found in source"))
-                self.after(0, lambda: self.scan_button.configure(state="normal"))
+                self.after(0, lambda: self.set_ui_state(True))
                 return
             
+            # Show folder selection dialog (thread-safe)
+            selected_folders = []
+            dialog_result = threading.Event()
+            
+            def show_folder_dialog():
+                nonlocal selected_folders
+                dialog = FolderSelectionWindow(self, folders)
+                dialog.wait_window()
+                if dialog.result == "process":
+                    selected_folders = dialog.get_selected_folders()
+                dialog_result.set()
+            
+            # Show dialog on main thread and wait for result
+            self.after(0, show_folder_dialog)
+            dialog_result.wait()
+            
+            if not selected_folders:
+                self.after(0, lambda: self.progress_label.configure(text="No folders selected. Cancelled."))
+                self.after(0, lambda: self.set_ui_state(True))
+                return
+            
+            # Process only selected folders
+            self.after(0, lambda: self.progress_label.configure(text=f"Building {len(selected_folders)} projects..."))
             self.projects = []
             
-            for i, folder in enumerate(folders):
-                self.after(0, lambda idx=i, total=total_projects, fld=folder: 
+            for i, folder in enumerate(selected_folders):
+                self.after(0, lambda idx=i, total=len(selected_folders), fld=folder: 
                           self.progress_label.configure(text=f"Processing {fld.name} ({idx+1}/{total})"))
                 
                 project = builder.build_project(folder)
@@ -498,12 +671,19 @@ class SeestarApp(ctk.CTk):
             
             self.after(0, lambda: self.progress_label.configure(text=f"Completed! Built {len(self.projects)} projects"))
             
+            # Show completion dialog
+            self.after(0, lambda: messagebox.showinfo(
+                "Processing Complete",
+                f"Successfully built {len(self.projects)} project(s):\n\n" +
+                "\n".join([f"  • {p.name}" for p in self.projects])
+            ))
+            
         except Exception as e:
             logger.error(f"Error during scan: {e}")
             self.after(0, lambda: messagebox.showerror("Error", f"Failed to scan: {str(e)}"))
         
         finally:
-            self.after(0, lambda: self.scan_button.configure(state="normal"))
+            self.after(0, lambda: self.set_ui_state(True))
     
     def copy_seestar_to_raw(self):
         """Copy <NAME>_sub folders from Seestar to Raw directory."""
@@ -571,7 +751,7 @@ class SeestarApp(ctk.CTk):
             self.after(0, lambda: messagebox.showerror("Error", f"Failed to analyze: {error_msg}"))
         
         finally:
-            self.after(0, lambda: self.analyze_button.configure(state="normal"))
+            self.after(0, lambda: self.set_ui_state(True))
     
     def show_analysis_window(self, results):
         """Show analysis results in a new window."""
