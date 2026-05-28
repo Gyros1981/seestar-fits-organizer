@@ -42,6 +42,7 @@ class AppSettings:
         self.settings: Dict = {
             'location_threshold': 0.005,  # degrees
             'timezone': 'PST',  # UTC, PST, EST, or Local
+            'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
         }
         
         self._load_settings()
@@ -117,4 +118,17 @@ class AppSettings:
             timezone: Timezone string (UTC, PST, EST, or Local)
         """
         self.settings['timezone'] = timezone
+        self._save_settings()
+    
+    def get_disclaimer_acknowledged(self) -> bool:
+        """Get whether the disclaimer has been acknowledged."""
+        return self.settings.get('disclaimer_acknowledged', False)
+    
+    def set_disclaimer_acknowledged(self, acknowledged: bool):
+        """Set whether the disclaimer has been acknowledged.
+        
+        Args:
+            acknowledged: True if acknowledged, False otherwise
+        """
+        self.settings['disclaimer_acknowledged'] = acknowledged
         self._save_settings()
