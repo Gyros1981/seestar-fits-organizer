@@ -28,6 +28,7 @@ class SeestarApp(ctk.CTk):
         self.seestar_dir = None
         self.raw_dir = None
         self.projects_dir = None
+        self.analyze_projects_dir = None  # Separate directory for analysis
         self.projects = []
         self.workflow_mode = "direct"  # "direct" or "intermediate"
         self.workflow_var = ctk.StringVar(value="direct")
@@ -71,14 +72,18 @@ class SeestarApp(ctk.CTk):
         )
         settings_button.pack(side="right")
         
+        # Scan & Build Projects Section
+        scan_build_frame = ctk.CTkFrame(main_frame)
+        scan_build_frame.pack(fill="x", pady=(0, 20))
+        
+        scan_build_label = ctk.CTkLabel(scan_build_frame, text="Scan & Build Projects", font=ctk.CTkFont(size=16, weight="bold"))
+        scan_build_label.pack(anchor="w", padx=10, pady=(10, 10))
+        
         # Workflow Selection
-        workflow_frame = ctk.CTkFrame(main_frame)
-        workflow_frame.pack(fill="x", pady=(0, 20))
+        workflow_label = ctk.CTkLabel(scan_build_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
+        workflow_label.pack(anchor="w", padx=10, pady=(0, 5))
         
-        workflow_label = ctk.CTkLabel(workflow_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
-        workflow_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        workflow_button_frame = ctk.CTkFrame(workflow_frame, fg_color="transparent")
+        workflow_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
         workflow_button_frame.pack(fill="x", padx=10, pady=(0, 10))
         
         self.direct_radio = ctk.CTkRadioButton(
@@ -102,7 +107,7 @@ class SeestarApp(ctk.CTk):
         
         # Workflow explanation
         self.workflow_explanation = ctk.CTkLabel(
-            workflow_frame,
+            scan_build_frame,
             text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory).",
             font=ctk.CTkFont(size=11),
             text_color="gray",
@@ -110,15 +115,11 @@ class SeestarApp(ctk.CTk):
         )
         self.workflow_explanation.pack(anchor="w", padx=10, pady=(0, 10))
         
-        # Folder Selection Frame
-        folder_frame = ctk.CTkFrame(main_frame)
-        folder_frame.pack(fill="x", pady=(0, 20))
-        
         # Seestar Device Directory (common to both workflows)
-        seestar_label = ctk.CTkLabel(folder_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
+        seestar_label = ctk.CTkLabel(scan_build_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
         seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
         
-        seestar_button_frame = ctk.CTkFrame(folder_frame, fg_color="transparent")
+        seestar_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
         seestar_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
         self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="gray")
@@ -128,10 +129,10 @@ class SeestarApp(ctk.CTk):
         seestar_button.pack(side="right")
         
         # Raw Directory (only for intermediate workflow)
-        self.raw_label = ctk.CTkLabel(folder_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
+        self.raw_label = ctk.CTkLabel(scan_build_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
         self.raw_label.pack(anchor="w", padx=10, pady=(10, 0))
         
-        raw_button_frame = ctk.CTkFrame(folder_frame, fg_color="transparent")
+        raw_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
         raw_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
         self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="gray")
@@ -140,11 +141,11 @@ class SeestarApp(ctk.CTk):
         raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
         raw_button.pack(side="right")
         
-        # Projects Directory (common to both workflows)
-        projects_label = ctk.CTkLabel(folder_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        # Projects Directory (for scan & build)
+        projects_label = ctk.CTkLabel(scan_build_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
         projects_label.pack(anchor="w", padx=10, pady=(10, 0))
         
-        projects_button_frame = ctk.CTkFrame(folder_frame, fg_color="transparent")
+        projects_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
         projects_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
         self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="gray")
@@ -153,27 +154,45 @@ class SeestarApp(ctk.CTk):
         projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
         projects_button.pack(side="right")
         
-        # Action Buttons
-        action_frame = ctk.CTkFrame(main_frame)
-        action_frame.pack(fill="x", pady=(0, 20))
-        
+        # Scan & Build Button
         self.scan_button = ctk.CTkButton(
-            action_frame, 
-            text="� Scan & Build Projects",
+            scan_build_frame, 
+            text="🔭 Scan & Build Projects",
             command=self.start_scan,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold")
         )
-        self.scan_button.pack(fill="x", padx=10, pady=(10, 5))
+        self.scan_button.pack(fill="x", padx=10, pady=(10, 10))
         
+        # Analyze Projects Section
+        analyze_frame = ctk.CTkFrame(main_frame)
+        analyze_frame.pack(fill="x", pady=(0, 20))
+        
+        analyze_label = ctk.CTkLabel(analyze_frame, text="Analyze Existing Projects", font=ctk.CTkFont(size=16, weight="bold"))
+        analyze_label.pack(anchor="w", padx=10, pady=(10, 10))
+        
+        # Projects Directory (for analysis)
+        analyze_projects_label = ctk.CTkLabel(analyze_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        analyze_projects_label.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        analyze_projects_button_frame = ctk.CTkFrame(analyze_frame, fg_color="transparent")
+        analyze_projects_button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color="gray")
+        self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
+        
+        analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100)
+        analyze_projects_button.pack(side="right")
+        
+        # Analyze Button
         self.analyze_button = ctk.CTkButton(
-            action_frame,
+            analyze_frame,
             text="🪐 Analyze Existing Projects",
             command=self.start_analysis,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold")
         )
-        self.analyze_button.pack(fill="x", padx=10, pady=(5, 10))
+        self.analyze_button.pack(fill="x", padx=10, pady=(0, 10))
         
         # Progress Frame
         progress_frame = ctk.CTkFrame(main_frame)
@@ -244,6 +263,14 @@ class SeestarApp(ctk.CTk):
             self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
             logger.info(f"Selected projects directory: {self.projects_dir}")
     
+    def select_analyze_projects_dir(self):
+        """Select projects directory for analysis."""
+        directory = filedialog.askdirectory(title="Select Projects Directory for Analysis")
+        if directory:
+            self.analyze_projects_dir = Path(directory)
+            self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
+            logger.info(f"Selected analyze projects directory: {self.analyze_projects_dir}")
+    
     def start_scan(self):
         """Start scanning and building projects in a separate thread."""
         # Validate directories based on workflow mode
@@ -265,8 +292,8 @@ class SeestarApp(ctk.CTk):
     
     def start_analysis(self):
         """Start analysis of existing projects."""
-        if not self.projects_dir:
-            messagebox.showerror("Error", "Please select Projects directory")
+        if not self.analyze_projects_dir:
+            messagebox.showerror("Error", "Please select Projects directory for analysis")
             return
         
         self.analyze_button.configure(state="disabled")
@@ -370,7 +397,7 @@ class SeestarApp(ctk.CTk):
         try:
             from project_analyzer import ProjectAnalyzer
             
-            analyzer = ProjectAnalyzer(self.projects_dir)
+            analyzer = ProjectAnalyzer(self.analyze_projects_dir)
             results = analyzer.analyze_all()
             
             logger.info(f"Analysis complete. Total projects: {results.total_projects}")
