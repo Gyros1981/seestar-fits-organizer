@@ -149,7 +149,7 @@ class SeestarApp(ctk.CTk):
         exit_btn.place(relx=1.0, x=-90, y=5)
         
         # Initialize mode tracking
-        self.current_mode = None  # None, 'scan_build', 'analyze', or 'settings'
+        self.current_mode = None  # None, 'scan_build', 'analyze', 'settings', or 'fits_viewer'
         
         # Content frame - main container for all views
         self.content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
@@ -182,6 +182,7 @@ class SeestarApp(ctk.CTk):
             text="Select a mode from the menu above to get started:\n\n"
                  "📁 File → 🔭 Scan & Build Projects\n"
                  "📁 File → 🪐 Analyze Projects\n"
+                 "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
             font=ctk.CTkFont(size=12),
             text_color="gray"
@@ -208,6 +209,9 @@ class SeestarApp(ctk.CTk):
         
         # Settings frame - full width (spans both columns)
         self._create_settings_frame()
+        
+        # FITS Viewer frame
+        self._create_fits_viewer_frame()
         
         # Redirect logging to console
         self.setup_console_logging()
@@ -645,6 +649,196 @@ class SeestarApp(ctk.CTk):
         )
         self.analyze_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
+    def _create_fits_viewer_frame(self):
+        """Create FITS Viewer mode frame (hidden initially)."""
+        self.fits_viewer_frame = ctk.CTkFrame(self.content_frame)
+        
+        # Title
+        title_label = ctk.CTkLabel(self.fits_viewer_frame, text="🖼️ FITS Viewer", font=ctk.CTkFont(size=16, weight="bold"))
+        title_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Directory selection frame
+        dir_frame = ctk.CTkFrame(self.fits_viewer_frame)
+        dir_frame.pack(fill="x", padx=10, pady=(0, 5))
+        
+        self.fits_viewer_dir_label = ctk.CTkLabel(dir_frame, text="No directory selected", text_color="gray")
+        self.fits_viewer_dir_label.pack(side="left", padx=10, pady=10)
+        
+        browse_btn = ctk.CTkButton(dir_frame, text="📁 Browse", command=self.browse_fits_directory, width=100)
+        browse_btn.pack(side="right", padx=10, pady=10)
+        
+        # Main content - split view
+        content_frame = ctk.CTkFrame(self.fits_viewer_frame)
+        content_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(1, weight=2)
+        content_frame.grid_rowconfigure(0, weight=1)
+        
+        # Left panel - file list
+        left_panel = ctk.CTkFrame(content_frame)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        
+        list_label = ctk.CTkLabel(left_panel, text="FITS Files", font=ctk.CTkFont(size=12, weight="bold"))
+        list_label.pack(anchor="w", padx=10, pady=(5, 0))
+        
+        self.fits_file_listbox = ctk.CTkScrollableFrame(left_panel)
+        self.fits_file_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Right panel - preview
+        right_panel = ctk.CTkFrame(content_frame)
+        right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        
+        preview_label = ctk.CTkLabel(right_panel, text="Preview", font=ctk.CTkFont(size=12, weight="bold"))
+        preview_label.pack(anchor="w", padx=10, pady=(5, 0))
+        
+        self.fits_preview_label = ctk.CTkLabel(right_panel, text="Select a FITS file to preview", text_color="gray")
+        self.fits_preview_label.pack(expand=True)
+        
+        # Status bar
+        self.fits_status_label = ctk.CTkLabel(self.fits_viewer_frame, text="Ready", text_color="gray")
+        self.fits_status_label.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        # Bind keyboard navigation
+        self.bind("<Up>", lambda e: self.navigate_fits_files(-1))
+        self.bind("<Down>", lambda e: self.navigate_fits_files(1))
+        
+        # Initialize viewer state
+        self.current_fits_directory = None
+        self.fits_files = []
+        self.selected_fits_index = -1
+        self.fits_file_buttons = []
+    
+    def browse_fits_directory(self):
+        """Browse for a directory containing FITS files."""
+        directory = filedialog.askdirectory(title="Select Directory with FITS Files")
+        if directory:
+            self.load_fits_directory(directory)
+    
+    def go_to_parent_directory(self):
+        """Navigate to parent directory."""
+        if self.current_fits_directory:
+            parent = Path(self.current_fits_directory).parent
+            if parent.exists():
+                self.load_fits_directory(str(parent))
+    
+    def load_fits_directory(self, directory):
+        """Load FITS files from a directory."""
+        self.current_fits_directory = directory
+        self.fits_viewer_dir_label.configure(text=directory)
+        
+        # Find all FITS files
+        path = Path(directory)
+        self.fits_files = sorted([f for f in path.iterdir() if f.is_file() and f.suffix.lower() in ['.fits', '.fit']])
+        
+        self.selected_fits_index = -1
+        self.refresh_fits_file_list()
+        
+        self.fits_status_label.configure(text=f"{len(self.fits_files)} FITS files found")
+    
+    def refresh_fits_file_list(self):
+        """Refresh the file list display."""
+        # Clear existing buttons
+        for btn in self.fits_file_buttons:
+            btn.destroy()
+        self.fits_file_buttons = []
+        
+        # Create buttons for each file
+        for i, file_path in enumerate(self.fits_files):
+            btn = ctk.CTkButton(
+                self.fits_file_listbox,
+                text=file_path.name,
+                anchor="w",
+                command=lambda idx=i: self.select_fits_file(idx)
+            )
+            btn.pack(fill="x", padx=5, pady=2)
+            self.fits_file_buttons.append(btn)
+    
+    def select_fits_file(self, index):
+        """Select a FITS file and show preview."""
+        if 0 <= index < len(self.fits_files):
+            self.selected_fits_index = index
+            file_path = self.fits_files[index]
+            
+            # Update visual selection
+            for i, btn in enumerate(self.fits_file_buttons):
+                if i == index:
+                    btn.configure(fg_color="#1E90FF")
+                else:
+                    btn.configure(fg_color=["#3B8ED0", "#1F6AA5"])
+            
+            # Show preview
+            self.show_fits_preview(file_path)
+            self.fits_status_label.configure(text=f"Selected: {file_path.name}")
+    
+    def navigate_fits_files(self, direction):
+        """Navigate through FITS files with keyboard."""
+        if not self.fits_files:
+            return
+        
+        new_index = self.selected_fits_index + direction
+        new_index = max(0, min(new_index, len(self.fits_files) - 1))
+        
+        if new_index != self.selected_fits_index:
+            self.select_fits_file(new_index)
+    
+    def show_fits_preview(self, file_path):
+        """Show preview of a FITS file."""
+        try:
+            from astropy.io import fits
+            from PIL import Image
+            import numpy as np
+            
+            # Load FITS data
+            with fits.open(file_path) as hdul:
+                data = hdul[0].data
+                
+                if data is None:
+                    self.fits_preview_label.configure(text="No image data", image=None)
+                    return
+                
+                # Normalize for display
+                if data.ndim == 2:
+                    # Single channel image
+                    norm_data = self._normalize_for_display(data)
+                    img = Image.fromarray((norm_data * 255).astype(np.uint8))
+                elif data.ndim == 3:
+                    # Multi-channel, use first channel
+                    norm_data = self._normalize_for_display(data[0])
+                    img = Image.fromarray((norm_data * 255).astype(np.uint8))
+                else:
+                    self.fits_preview_label.configure(text="Unsupported image format", image=None)
+                    return
+                
+                # Resize to fit preview area (max 600x500)
+                img.thumbnail((600, 500), Image.Resampling.LANCZOS)
+                
+                # Convert to CTkImage
+                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                
+                self.fits_preview_label.configure(text="", image=ctk_img)
+                
+        except Exception as e:
+            logger.error(f"Error loading FITS preview: {e}")
+            self.fits_preview_label.configure(text=f"Error loading preview:\n{str(e)[:100]}", image=None)
+    
+    def _normalize_for_display(self, data):
+        """Normalize image data for display."""
+        import numpy as np
+        
+        # Remove NaN and Inf
+        data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
+        
+        # Use percentiles for better contrast
+        vmin = np.percentile(data, 1)
+        vmax = np.percentile(data, 99)
+        
+        if vmax > vmin:
+            normalized = (data - vmin) / (vmax - vmin)
+        else:
+            normalized = np.zeros_like(data)
+        
+        return np.clip(normalized, 0, 1)
+
     def _create_settings_frame(self):
         """Create Settings mode frame (hidden initially)."""
         self.settings_frame = ctk.CTkFrame(self.content_frame)
@@ -824,6 +1018,7 @@ class SeestarApp(ctk.CTk):
             # Hide normal mode panels, show settings full width
             self.left_panel.grid_forget()
             self.right_panel.grid_forget()
+            self.fits_viewer_frame.grid_forget()
             self.settings_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=20, pady=10)
             self.progress_label.configure(text="Settings mode - configure app settings and click Save")
             
@@ -832,9 +1027,17 @@ class SeestarApp(ctk.CTk):
                 self.disclaimer_switch.select()
             else:
                 self.disclaimer_switch.deselect()
-        else:
-            # Hide settings, show normal layout
+        elif mode == 'fits_viewer':
+            # Hide normal mode panels, show fits viewer full width
+            self.left_panel.grid_forget()
+            self.right_panel.grid_forget()
             self.settings_frame.grid_forget()
+            self.fits_viewer_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+            self.progress_label.configure(text="FITS Viewer - browse and preview FITS files")
+        else:
+            # Hide settings and fits viewer, show normal layout
+            self.settings_frame.grid_forget()
+            self.fits_viewer_frame.grid_forget()
             self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
             self.right_panel.grid(row=0, column=1, sticky="nsew")
             
@@ -933,7 +1136,7 @@ class SeestarApp(ctk.CTk):
         self._tools_menu = ctk.CTkToplevel(self)
         menu = self._tools_menu
         # Position below Tools button (y + 40 to be below the button)
-        menu.geometry(f"200x60+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
+        menu.geometry(f"200x50+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
@@ -943,7 +1146,13 @@ class SeestarApp(ctk.CTk):
                 self._tools_menu.destroy()
             self._tools_menu = None
         
-        ctk.CTkLabel(menu, text="No tools available", text_color="gray").pack(pady=15)
+        def fits_viewer_and_close():
+            close_menu()
+            self.lift()
+            self.after(100, lambda: self.show_mode('fits_viewer'))
+        
+        ctk.CTkButton(menu, text="🖼️ FITS Viewer", 
+                     command=fits_viewer_and_close).pack(fill="x", padx=10, pady=5)
         
         menu.bind("<Escape>", lambda e: close_menu())
         menu.focus_set()
