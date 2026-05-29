@@ -750,15 +750,23 @@ class AnalysisWindow(ctk.CTkToplevel):
         try:
             # Get project path
             project_path = Path(project['path'])
+            fits_files = []
+            
+            # First try lights folder
             lights_folder = project_path / 'lights'
+            if lights_folder.exists():
+                fits_files = list(lights_folder.glob('*.fits')) + list(lights_folder.glob('*.FIT'))
             
-            if not lights_folder.exists():
-                messagebox.showwarning("No Images", "Lights folder not found for this project.")
+            # If no lights folder or no files found, search entire project directory
+            if not fits_files:
+                for item in project_path.rglob('*.fits'):
+                    fits_files.append(item)
+                for item in project_path.rglob('*.FIT'):
+                    fits_files.append(item)
+            
+            if not fits_files:
+                messagebox.showwarning("No Images", "No FITS files found for this project.")
                 return
-            
-            # Find the first light frame matching this object name
-            # Look for FITS files that contain the object name in filename
-            fits_files = list(lights_folder.glob('*.fits')) + list(lights_folder.glob('*.FIT'))
             
             # Try to find a file matching the object name first
             image_file = None
@@ -767,13 +775,9 @@ class AnalysisWindow(ctk.CTkToplevel):
                     image_file = fits_file
                     break
             
-            # If no match, just take the first light file
-            if not image_file and fits_files:
-                image_file = fits_files[0]
-            
+            # If no match, just take the first file
             if not image_file:
-                messagebox.showwarning("No Images", "No FITS files found for this project.")
-                return
+                image_file = fits_files[0]
             
             # Open preview window
             PreviewWindow(self, image_file)

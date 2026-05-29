@@ -3,8 +3,9 @@ Project Analyzer Module
 Analyzes existing projects and generates aggregate statistics.
 """
 
+import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 from datetime import datetime
 import logging
 from .fits_metadata import FitsMetadata
@@ -130,21 +131,53 @@ class ProjectAnalyzer:
         self.projects_dir = projects_dir
     
     def analyze_all(self) -> AggregateAnalysis:
-        """Analyze all projects in the projects directory."""
+        """Analyze all projects in the projects directory.
+        
+        First tries to find _Project folders. If none found, falls back to
+        any directory containing FITS files (one level deep only).
+        """
         aggregate = AggregateAnalysis()
         
         logger.info(f"Analyzing projects directory: {self.projects_dir}")
         
-        # Find all project folders (ending with _Project)
+        # First: Look for _Project folders
         project_folders = []
         for item in self.projects_dir.iterdir():
             if item.is_dir() and item.name.endswith('_Project'):
                 project_folders.append(item)
         
-        logger.info(f"Found {len(project_folders)} projects to analyze")
+        if project_folders:
+            logger.info(f"Found {len(project_folders)} _Project folders to analyze")
+        else:
+            # Fallback: Look for any directory with FITS files (one level only)
+            logger.info("No _Project folders found, scanning for directories with FITS files...")
+            project_folders = set()
+            
+            for item in self.projects_dir.iterdir():
+                if item.is_dir():
+                    # Check if this folder contains FITS files (not recursive, one level only)
+                    has_fits = False
+                    for file in item.iterdir():
+                        if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
+                            has_fits = True
+                            break
+                        # Also check subfolders like lights/, darks/, etc.
+                        if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                            for subfile in file.iterdir():
+                                if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
+                                    has_fits = True
+                                    break
+                            if has_fits:
+                                break
+                    
+                    if has_fits:
+                        project_folders.add(item)
+            
+            project_folders = sorted(project_folders)
+            logger.info(f"Found {len(project_folders)} directories with FITS files to analyze")
         
         if not project_folders:
-            logger.warning(f"No _Project folders found in {self.projects_dir}")
+            logger.warning(f"No project folders found in {self.projects_dir}")
             return aggregate
         
         for folder in project_folders:
@@ -161,10 +194,14 @@ class ProjectAnalyzer:
         """Analyze a single project."""
         analysis = ProjectAnalysis(project_path.name, project_path)
         
-        # Analyze lights folder (where all FITS files are stored)
-        lights_folder = project_path / 'lights'
-        if lights_folder.exists():
-            fits_files = list(lights_folder.glob('*.fits')) + list(lights_folder.glob('*.FIT'))
+        # Find all FITS files in the project directory (recursively)
+        fits_files: List[Path] = []
+        for root, dirs, files in os.walk(project_path):
+            for file in files:
+                if file.lower().endswith('.fits') or file.lower().endswith('.fit'):
+                    fits_files.append(Path(root) / file)
+        
+        if fits_files:
             
             # Collect timestamps per object for session grouping
             object_timestamps = {}  # {object: [timestamps]}
