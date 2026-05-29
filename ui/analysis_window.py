@@ -593,6 +593,32 @@ class AnalysisWindow(ctk.CTkToplevel):
             logger.error(f"Failed to open Google Maps: {e}")
             messagebox.showerror("Error", f"Failed to open Google Maps: {str(e)}")
     
+    def open_sky_atlas(self, ra: str, dec: str, obj_name: str):
+        """Open Aladin Lite sky atlas centered on the object's RA/DEC coordinates."""
+        try:
+            if ra and dec:
+                # Aladin Lite expects RA and DEC in degrees
+                # RA: 0-360 degrees, DEC: -90 to +90 degrees
+                ra_degrees = float(ra)
+                dec_degrees = float(dec)
+                
+                # Aladin Lite URL format with DSS colored survey
+                # Seestar S50 FOV: 0.73° x 1°, using 1.2° to show full context
+                url = f"https://aladin.u-strasbg.fr/AladinLite/?target={ra_degrees:.5f}%20{dec_degrees:.5f}&fov=1.2&survey=CDS%2FP%2FDSS2%2Fcolor"
+                webbrowser.open(url)
+                logger.info(f"Opened Aladin Lite for RA: {ra_degrees:.5f}°, DEC: {dec_degrees:.5f}°")
+            elif obj_name and obj_name.strip():
+                # Fallback to Telescopius with object name if no coordinates
+                encoded_name = obj_name.replace(' ', '%20')
+                url = f"https://telescopius.com/deepsky/objinfo/{encoded_name}"
+                webbrowser.open(url)
+                logger.info(f"Opened Telescopius for object: {obj_name}")
+            else:
+                messagebox.showwarning("No Coordinates", "No RA/DEC coordinates or object name available.")
+        except Exception as e:
+            logger.error(f"Failed to open sky atlas: {e}")
+            messagebox.showerror("Error", f"Failed to open sky atlas: {str(e)}")
+    
     def open_tag_dialog(self, lat: str, lon: str):
         """Open dialog to add/edit location tag."""
         tag = self.location_tags.get_tag(lat, lon)
@@ -848,8 +874,9 @@ class AnalysisWindow(ctk.CTkToplevel):
         open_button.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Individual sessions expandable sections
+        # Session tuple: (obj_name, ra, dec, start, end, lights, integration, exposures, lights_by_exposure)
         if project.get('sessions'):
-            for idx, (obj, start, end, lights, integration, exposures, lights_by_exposure) in enumerate(project['sessions']):
+            for idx, (obj, ra, dec, start, end, lights, integration, exposures, lights_by_exposure) in enumerate(project['sessions']):
                 session_frame = ctk.CTkFrame(self.details_scroll)
                 session_frame.pack(fill="x", padx=10, pady=5)
                 
@@ -919,6 +946,37 @@ class AnalysisWindow(ctk.CTkToplevel):
                         command=lambda l=project['latitude'], ln=project['longitude']: self.open_google_maps(str(l), str(ln))
                     )
                     maps_button.pack(fill="x", padx=10, pady=(0, 10))
+                
+                # Object Information section
+                object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=ctk.CTkFont(weight="bold"))
+                object_info_label.pack(anchor="w", padx=10, pady=(5, 2))
+                
+                # Object name
+                obj_textbox = ctk.CTkTextbox(session_content, height=25)
+                obj_textbox.pack(fill="x", padx=10, pady=2)
+                obj_textbox.insert("1.0", f"Name: {obj}")
+                obj_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                
+                # RA/DEC coordinates
+                if ra or dec:
+                    ra_val = ra if ra else "N/A"
+                    dec_val = dec if dec else "N/A"
+                    coords_textbox = ctk.CTkTextbox(session_content, height=25)
+                    coords_textbox.pack(fill="x", padx=10, pady=2)
+                    coords_textbox.insert("1.0", f"RA: {ra_val}, DEC: {dec_val}")
+                    coords_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    
+                    # Sky Atlas button - Open Aladin Lite with object coordinates
+                    sky_button = ctk.CTkButton(
+                        session_content,
+                        text="🔭 Open in Sky Atlas (Aladin)",
+                        font=ctk.CTkFont(size=12),
+                        height=32,
+                        fg_color="#2E86AB",
+                        hover_color="#1E5F7A",
+                        command=lambda r=ra, d=dec, name=obj: self.open_sky_atlas(r, d, name)
+                    )
+                    sky_button.pack(fill="x", padx=10, pady=(0, 10))
                 
                 # Time section
                 time_label = ctk.CTkLabel(session_content, text="Time:", font=ctk.CTkFont(weight="bold"))

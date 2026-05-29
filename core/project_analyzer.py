@@ -169,6 +169,7 @@ class ProjectAnalyzer:
             # Collect timestamps per object for session grouping
             object_timestamps = {}  # {object: [timestamps]}
             object_session_data = {}  # {object: [(timestamp, exptime, is_light)]}
+            object_coords = {}  # {object: (ra, dec)} - RA/DEC per object
             
             for fits_path in fits_files:
                 try:
@@ -209,6 +210,10 @@ class ProjectAnalyzer:
                     
                     if metadata.object:
                         analysis.objects.add(metadata.object)
+                        # Capture RA/DEC for this object (use first frame with coordinates)
+                        if metadata.object not in object_coords:
+                            if metadata.ra and metadata.dec:
+                                object_coords[metadata.object] = (metadata.ra, metadata.dec)
                         # Collect timestamps per object with session data
                         if metadata.date_obs:
                             if metadata.object not in object_timestamps:
@@ -242,13 +247,16 @@ class ProjectAnalyzer:
                 obj_data = object_session_data.get(obj_name, [])
                 obj_data_dict = {ts: (exptime, is_light) for ts, exptime, is_light in obj_data}
                 
+                # Get RA/DEC for this object
+                ra, dec = object_coords.get(obj_name, (None, None))
+                
                 for ts in timestamps[1:]:
                     dt = datetime.fromisoformat(ts)
                     prev_dt = datetime.fromisoformat(current_session_end)
                     
                     if dt - prev_dt > gap_threshold:
                         # End current session
-                        analysis.sessions.append((obj_name, current_session_start, current_session_end, 
+                        analysis.sessions.append((obj_name, ra, dec, current_session_start, current_session_end, 
                                                   current_session_lights, current_session_integration, 
                                                   sorted(list(current_session_exposures)),
                                                   dict(sorted(current_session_lights_by_exposure.items()))))
@@ -277,7 +285,7 @@ class ProjectAnalyzer:
                                 current_session_lights_by_exposure[exptime] += 1
                 
                 # Add final session for this object
-                analysis.sessions.append((obj_name, current_session_start, current_session_end,
+                analysis.sessions.append((obj_name, ra, dec, current_session_start, current_session_end,
                                           current_session_lights, current_session_integration,
                                           sorted(list(current_session_exposures)),
                                           dict(sorted(current_session_lights_by_exposure.items()))))
