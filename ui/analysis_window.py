@@ -19,6 +19,72 @@ from .preview_window import PreviewWindow
 logger = logging.getLogger(__name__)
 
 
+def _deg_to_hms(ra_deg: float) -> str:
+    """Convert RA from decimal degrees to hours:minutes:seconds format."""
+    if ra_deg is None:
+        return 'N/A'
+    try:
+        ra_hours = ra_deg / 15.0  # Convert degrees to hours (360 deg = 24 hours)
+        hours = int(ra_hours)
+        minutes_float = (ra_hours - hours) * 60
+        minutes = int(minutes_float)
+        seconds = (minutes_float - minutes) * 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:05.2f}"
+    except (ValueError, TypeError):
+        return str(ra_deg)
+
+
+def _deg_to_dms(dec_deg: float) -> str:
+    """Convert DEC from decimal degrees to degrees:minutes:seconds format."""
+    if dec_deg is None:
+        return 'N/A'
+    try:
+        sign = '-' if dec_deg < 0 else '+'
+        dec_abs = abs(dec_deg)
+        degrees = int(dec_abs)
+        minutes_float = (dec_abs - degrees) * 60
+        minutes = int(minutes_float)
+        seconds = (minutes_float - minutes) * 60
+        return f"{sign}{degrees:02d}:{minutes:02d}:{seconds:05.2f}"
+    except (ValueError, TypeError):
+        return str(dec_deg)
+
+
+def format_ra_dec(ra, dec, format_type: str = 'degrees') -> tuple:
+    """Format RA and DEC values according to the specified format.
+    
+    Args:
+        ra: Right Ascension in decimal degrees or None
+        dec: Declination in decimal degrees or None
+        format_type: 'degrees' or 'hms'
+        
+    Returns:
+        Tuple of (ra_string, dec_string)
+    """
+    if format_type == 'hms':
+        # Convert to float first if they're strings
+        try:
+            ra_float = float(ra) if ra is not None else None
+        except (ValueError, TypeError):
+            ra_float = None
+        try:
+            dec_float = float(dec) if dec is not None else None
+        except (ValueError, TypeError):
+            dec_float = None
+        return _deg_to_hms(ra_float), _deg_to_dms(dec_float)
+    else:
+        # Decimal degrees format
+        try:
+            ra_val = f"{float(ra):.5f}" if ra is not None else 'N/A'
+        except (ValueError, TypeError):
+            ra_val = str(ra) if ra else 'N/A'
+        try:
+            dec_val = f"{float(dec):.5f}" if dec is not None else 'N/A'
+        except (ValueError, TypeError):
+            dec_val = str(dec) if dec else 'N/A'
+        return ra_val, dec_val
+
+
 class AnalysisWindow(ctk.CTkToplevel):
     """
     Window for displaying project analysis results.
@@ -96,8 +162,12 @@ class AnalysisWindow(ctk.CTkToplevel):
                 
                 # Write session details section
                 writer.writerow(['SESSION DETAILS'])
+                # Get coordinate format for header
+                coord_format = self.settings.get_coordinate_format()
+                ra_header = 'RA (HMS)' if coord_format == 'hms' else 'RA (deg)'
+                dec_header = 'DEC (DMS)' if coord_format == 'hms' else 'DEC (deg)'
                 writer.writerow(['Project Name', 'Session Start', 'Session End', 'Duration (hrs)',
-                               'Object Name', 'RA (deg)', 'DEC (deg)',
+                               'Object Name', ra_header, dec_header,
                                'Location Name', 'Latitude', 'Longitude',
                                'Lights', 'Darks', 'Flats', 'Bias',
                                'Integration Time (hrs)', 'Exposures'])
@@ -151,16 +221,9 @@ class AnalysisWindow(ctk.CTkToplevel):
                         if session_end != 'N/A':
                             session_end = self._format_datetime(session_end)
                         
-                        # Format RA/DEC values (convert from string to float if needed)
-                        try:
-                            ra_val = f"{float(ra):.5f}" if ra is not None else 'N/A'
-                        except (ValueError, TypeError):
-                            ra_val = str(ra) if ra else 'N/A'
-                        
-                        try:
-                            dec_val = f"{float(dec):.5f}" if dec is not None else 'N/A'
-                        except (ValueError, TypeError):
-                            dec_val = str(dec) if dec else 'N/A'
+                        # Get coordinate format setting and format RA/DEC values
+                        coord_format = self.settings.get_coordinate_format()
+                        ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
                         
                         writer.writerow([
                             project_name, session_start, session_end, f"{duration_hrs:.2f}",
@@ -1069,8 +1132,9 @@ class AnalysisWindow(ctk.CTkToplevel):
                 
                 # RA/DEC coordinates
                 if ra or dec:
-                    ra_val = ra if ra else "N/A"
-                    dec_val = dec if dec else "N/A"
+                    # Use coordinate format setting for display
+                    coord_format = self.settings.get_coordinate_format()
+                    ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
                     coords_textbox = ctk.CTkTextbox(session_content, height=25)
                     coords_textbox.pack(fill="x", padx=10, pady=2)
                     coords_textbox.insert("1.0", f"RA: {ra_val}, DEC: {dec_val}")

@@ -43,6 +43,7 @@ class AppSettings:
             'location_threshold': 0.005,  # degrees
             'timezone': 'PST',  # UTC, PST, EST, or Local
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
+            'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
         }
         
         self._load_settings()
@@ -132,3 +133,17 @@ class AppSettings:
         """
         self.settings['disclaimer_acknowledged'] = acknowledged
         self._save_settings()
+    
+    def get_coordinate_format(self) -> str:
+        """Get the coordinate format setting."""
+        return self.settings.get('coordinate_format', 'degrees')
+    
+    def set_coordinate_format(self, format_type: str):
+        """Set the coordinate format.
+        
+        Args:
+            format_type: 'degrees' or 'hms' (hours/minutes/seconds for RA, deg/min/sec for DEC)
+        """
+        if format_type in ['degrees', 'hms']:
+            self.settings['coordinate_format'] = format_type
+            self._save_settings()

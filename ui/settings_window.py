@@ -40,7 +40,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.location_tags = location_tags
         
         self.title("Settings")
-        self.geometry("500x600")
+        self.geometry("500x700")
         self.transient(parent)
         self.grab_set()
         
@@ -52,16 +52,20 @@ class SettingsWindow(ctk.CTkToplevel):
         main_frame = ctk.CTkFrame(self)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Title
+        # Title (fixed at top)
         title_label = ctk.CTkLabel(
             main_frame,
             text="Settings",
             font=ctk.CTkFont(size=20, weight="bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(pady=(0, 10))
+        
+        # Scrollable frame for settings content
+        scroll_frame = ctk.CTkScrollableFrame(main_frame)
+        scroll_frame.pack(fill="both", expand=True, pady=(0, 10))
         
         # Location Settings Section
-        location_frame = ctk.CTkFrame(main_frame)
+        location_frame = ctk.CTkFrame(scroll_frame)
         location_frame.pack(fill="x", pady=(0, 15))
         
         location_label = ctk.CTkLabel(
@@ -91,7 +95,7 @@ class SettingsWindow(ctk.CTkToplevel):
         threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Timezone Settings Section
-        timezone_frame = ctk.CTkFrame(main_frame)
+        timezone_frame = ctk.CTkFrame(scroll_frame)
         timezone_frame.pack(fill="x", pady=(0, 15))
         
         timezone_label = ctk.CTkLabel(
@@ -126,8 +130,48 @@ class SettingsWindow(ctk.CTkToplevel):
         else:
             self.timezone_menu.set("PST (UTC-8)")
         
+        # Coordinate Format Section
+        coord_frame = ctk.CTkFrame(scroll_frame)
+        coord_frame.pack(fill="x", pady=(0, 15))
+        
+        coord_label = ctk.CTkLabel(
+            coord_frame,
+            text="Coordinate Format",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        coord_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Coordinate format selection
+        coord_menu_label = ctk.CTkLabel(
+            coord_frame,
+            text="RA/DEC Display Format:"
+        )
+        coord_menu_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.coord_menu = ctk.CTkOptionMenu(
+            coord_frame,
+            values=["Decimal Degrees", "Hours/Minutes/Seconds (RA) + DMS (DEC)"],
+            command=None
+        )
+        self.coord_menu.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Map coordinate format setting to menu value
+        coord_setting = self.settings.get_coordinate_format()
+        if coord_setting == "hms":
+            self.coord_menu.set("Hours/Minutes/Seconds (RA) + DMS (DEC)")
+        else:
+            self.coord_menu.set("Decimal Degrees")
+        
+        coord_help = ctk.CTkLabel(
+            coord_frame,
+            text="'Hours/Minutes/Seconds' shows RA as HH:MM:SS and DEC as DD:MM:SS",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        coord_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
         # Location Tags Section
-        tags_frame = ctk.CTkFrame(main_frame)
+        tags_frame = ctk.CTkFrame(scroll_frame)
         tags_frame.pack(fill="x", pady=(0, 15))
         
         tags_label = ctk.CTkLabel(
@@ -158,7 +202,7 @@ class SettingsWindow(ctk.CTkToplevel):
         export_button.pack(side="right", fill="x", expand=True, padx=(5, 0))
         
         # Disclaimer Section
-        disclaimer_frame = ctk.CTkFrame(main_frame)
+        disclaimer_frame = ctk.CTkFrame(scroll_frame)
         disclaimer_frame.pack(fill="x", pady=(0, 15))
         
         disclaimer_label = ctk.CTkLabel(
@@ -184,9 +228,9 @@ class SettingsWindow(ctk.CTkToplevel):
         )
         disclaimer_help.pack(anchor="w", padx=10, pady=(0, 10))
         
-        # Save/Cancel buttons
+        # Save/Cancel buttons (fixed at bottom, outside scroll area)
         action_frame = ctk.CTkFrame(main_frame)
-        action_frame.pack(fill="x", pady=(20, 0))
+        action_frame.pack(fill="x", pady=(10, 0))
         
         save_button = ctk.CTkButton(
             action_frame,
@@ -269,6 +313,13 @@ class SettingsWindow(ctk.CTkToplevel):
                 self.settings.set_timezone("Local")
             else:
                 self.settings.set_timezone("PST")
+            
+            # Save coordinate format
+            coord_value = self.coord_menu.get()
+            if "Hours/Minutes/Seconds" in coord_value:
+                self.settings.set_coordinate_format("hms")
+            else:
+                self.settings.set_coordinate_format("degrees")
             
             messagebox.showinfo("Success", "Settings saved successfully!")
             self.destroy()
