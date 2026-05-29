@@ -14,6 +14,7 @@ import platform
 import webbrowser
 import logging
 from pathlib import Path
+from .preview_window import PreviewWindow
 
 logger = logging.getLogger(__name__)
 
@@ -619,6 +620,44 @@ class AnalysisWindow(ctk.CTkToplevel):
             logger.error(f"Failed to open sky atlas: {e}")
             messagebox.showerror("Error", f"Failed to open sky atlas: {str(e)}")
     
+    def open_image_preview(self, project: dict, object_name: str):
+        """Open image preview window for the first light frame of this object."""
+        try:
+            # Get project path
+            project_path = Path(project['path'])
+            lights_folder = project_path / 'lights'
+            
+            if not lights_folder.exists():
+                messagebox.showwarning("No Images", "Lights folder not found for this project.")
+                return
+            
+            # Find the first light frame matching this object name
+            # Look for FITS files that contain the object name in filename
+            fits_files = list(lights_folder.glob('*.fits')) + list(lights_folder.glob('*.FIT'))
+            
+            # Try to find a file matching the object name first
+            image_file = None
+            for fits_file in fits_files:
+                if object_name.lower() in fits_file.name.lower():
+                    image_file = fits_file
+                    break
+            
+            # If no match, just take the first light file
+            if not image_file and fits_files:
+                image_file = fits_files[0]
+            
+            if not image_file:
+                messagebox.showwarning("No Images", "No FITS files found for this project.")
+                return
+            
+            # Open preview window
+            PreviewWindow(self, image_file)
+            logger.info(f"Opened preview for {image_file.name}")
+            
+        except Exception as e:
+            logger.error(f"Failed to open image preview: {e}")
+            messagebox.showerror("Error", f"Failed to open image preview: {str(e)}")
+    
     def open_tag_dialog(self, lat: str, lon: str):
         """Open dialog to add/edit location tag."""
         tag = self.location_tags.get_tag(lat, lon)
@@ -976,7 +1015,19 @@ class AnalysisWindow(ctk.CTkToplevel):
                         hover_color="#1E5F7A",
                         command=lambda r=ra, d=dec, name=obj: self.open_sky_atlas(r, d, name)
                     )
-                    sky_button.pack(fill="x", padx=10, pady=(0, 10))
+                    sky_button.pack(fill="x", padx=10, pady=(0, 5))
+                    
+                    # Preview Image button
+                    preview_button = ctk.CTkButton(
+                        session_content,
+                        text="🔍 Preview Image",
+                        font=ctk.CTkFont(size=12),
+                        height=32,
+                        fg_color="#4A90A4",
+                        hover_color="#3A7A8C",
+                        command=lambda p=project, o=obj: self.open_image_preview(p, o)
+                    )
+                    preview_button.pack(fill="x", padx=10, pady=(0, 10))
                 
                 # Time section
                 time_label = ctk.CTkLabel(session_content, text="Time:", font=ctk.CTkFont(weight="bold"))
