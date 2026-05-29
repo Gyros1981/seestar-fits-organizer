@@ -50,6 +50,33 @@ def _deg_to_dms(dec_deg: float) -> str:
         return str(dec_deg)
 
 
+def get_constellation(ra, dec) -> str:
+    """Get constellation name from RA/DEC coordinates using astropy.
+    
+    Args:
+        ra: Right Ascension in decimal degrees
+        dec: Declination in decimal degrees
+        
+    Returns:
+        Constellation name or 'Unknown' if cannot determine
+    """
+    try:
+        ra_float = float(ra) if ra is not None else None
+        dec_float = float(dec) if dec is not None else None
+        
+        if ra_float is None or dec_float is None:
+            return 'Unknown'
+        
+        from astropy.coordinates import SkyCoord
+        import astropy.units as u
+        
+        coord = SkyCoord(ra=ra_float*u.degree, dec=dec_float*u.degree, frame='icrs')
+        return coord.get_constellation()
+    except Exception as e:
+        logger.debug(f"Could not determine constellation: {e}")
+        return 'Unknown'
+
+
 def format_ra_dec(ra, dec, format_type: str = 'degrees') -> tuple:
     """Format RA and DEC values according to the specified format.
     
@@ -167,7 +194,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 ra_header = 'RA (HMS)' if coord_format == 'hms' else 'RA (deg)'
                 dec_header = 'DEC (DMS)' if coord_format == 'hms' else 'DEC (deg)'
                 writer.writerow(['Project Name', 'Session Start', 'Session End', 'Duration (hrs)',
-                               'Object Name', ra_header, dec_header,
+                               'Object Name', ra_header, dec_header, 'Constellation',
                                'Location Name', 'Latitude', 'Longitude',
                                'Lights', 'Darks', 'Flats', 'Bias',
                                'Integration Time (hrs)', 'Exposures'])
@@ -225,9 +252,12 @@ class AnalysisWindow(ctk.CTkToplevel):
                         coord_format = self.settings.get_coordinate_format()
                         ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
                         
+                        # Get constellation
+                        constellation = get_constellation(ra, dec)
+                        
                         writer.writerow([
                             project_name, session_start, session_end, f"{duration_hrs:.2f}",
-                            obj_name, ra_val, dec_val,
+                            obj_name, ra_val, dec_val, constellation,
                             location_name, lat, lon,
                             lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
                             f"{integration_hrs:.2f}", exposure_str
@@ -1143,6 +1173,14 @@ class AnalysisWindow(ctk.CTkToplevel):
                     coords_textbox.pack(fill="x", padx=10, pady=2)
                     coords_textbox.insert("1.0", f"RA: {ra_val}, DEC: {dec_val}")
                     coords_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    
+                    # Constellation
+                    constellation = get_constellation(ra, dec)
+                    if constellation and constellation != 'Unknown':
+                        const_textbox = ctk.CTkTextbox(session_content, height=25)
+                        const_textbox.pack(fill="x", padx=10, pady=2)
+                        const_textbox.insert("1.0", f"Constellation: {constellation}")
+                        const_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
                     
                     # Sky Atlas button - Open Aladin Lite with object coordinates
                     sky_button = ctk.CTkButton(
