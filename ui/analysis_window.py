@@ -46,6 +46,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.results = results
         self.settings = settings
         self.location_tags = location_tags
+        self.current_project = None  # Track currently selected project for view refresh
         
         self.setup_ui()
         
@@ -96,7 +97,9 @@ class AnalysisWindow(ctk.CTkToplevel):
                 # Write session details section
                 writer.writerow(['SESSION DETAILS'])
                 writer.writerow(['Project Name', 'Session Start', 'Session End', 'Duration (hrs)',
-                               'Location Name', 'Location (Lat, Lon)', 'Lights', 'Darks', 'Flats', 'Bias',
+                               'Object Name', 'RA (deg)', 'DEC (deg)',
+                               'Location Name', 'Latitude', 'Longitude',
+                               'Lights', 'Darks', 'Flats', 'Bias',
                                'Integration Time (hrs)', 'Exposures'])
                 
                 for project in self.results['projects']:
@@ -104,14 +107,16 @@ class AnalysisWindow(ctk.CTkToplevel):
                     sessions = project.get('sessions', [])
                     
                     for session in sessions:
-                        # Sessions are tuples: (object, start, end, lights, integration_seconds, exposures, lights_by_exposure)
+                        # Sessions are tuples: (obj_name, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure)
                         obj_name = session[0] if len(session) > 0 else 'N/A'
-                        session_start = session[1] if len(session) > 1 else 'N/A'
-                        session_end = session[2] if len(session) > 2 else 'N/A'
-                        lights = session[3] if len(session) > 3 else 0
-                        integration_sec = session[4] if len(session) > 4 else 0
-                        exposures = session[5] if len(session) > 5 else []
-                        lights_by_exposure = session[6] if len(session) > 6 else {}
+                        ra = session[1] if len(session) > 1 else None
+                        dec = session[2] if len(session) > 2 else None
+                        session_start = session[3] if len(session) > 3 else 'N/A'
+                        session_end = session[4] if len(session) > 4 else 'N/A'
+                        lights = session[5] if len(session) > 5 else 0
+                        integration_sec = session[6] if len(session) > 6 else 0
+                        exposures = session[7] if len(session) > 7 else []
+                        lights_by_exposure = session[8] if len(session) > 8 else {}
                         
                         # Calculate duration
                         duration_hrs = 0
@@ -146,9 +151,22 @@ class AnalysisWindow(ctk.CTkToplevel):
                         if session_end != 'N/A':
                             session_end = self._format_datetime(session_end)
                         
+                        # Format RA/DEC values (convert from string to float if needed)
+                        try:
+                            ra_val = f"{float(ra):.5f}" if ra is not None else 'N/A'
+                        except (ValueError, TypeError):
+                            ra_val = str(ra) if ra else 'N/A'
+                        
+                        try:
+                            dec_val = f"{float(dec):.5f}" if dec is not None else 'N/A'
+                        except (ValueError, TypeError):
+                            dec_val = str(dec) if dec else 'N/A'
+                        
                         writer.writerow([
                             project_name, session_start, session_end, f"{duration_hrs:.2f}",
-                            location_name, location_str, lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
+                            obj_name, ra_val, dec_val,
+                            location_name, lat, lon,
+                            lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
                             f"{integration_hrs:.2f}", exposure_str
                         ])
                 
@@ -166,6 +184,44 @@ class AnalysisWindow(ctk.CTkToplevel):
                 # Calculate total sessions from project data
                 total_sessions = sum(len(project.get('sessions', [])) for project in self.results['projects'])
                 writer.writerow(['Total Sessions', total_sessions])
+                
+                # Write stored locations section
+                writer.writerow([])  # Empty row separator
+                writer.writerow(['STORED LOCATIONS'])
+                writer.writerow(['Location Name', 'Latitude', 'Longitude', 'Notes'])
+                
+                # Collect all unique locations from location_tags
+                all_tags = []
+                try:
+                    # Use get_all_tags() method to get all tags
+                    tags_data = self.location_tags.get_all_tags()
+                    for key, tag_info in tags_data.items():
+                        # Key is in format "lat,lon"
+                        try:
+                            lat, lon = key.split(',')
+                            all_tags.append({
+                                'name': tag_info.get('name', 'Unnamed'),
+                                'lat': lat,
+                                'lon': lon,
+                                'notes': tag_info.get('notes', '')
+                            })
+                        except ValueError:
+                            # Skip invalid keys
+                            continue
+                    
+                    # Sort by location name
+                    all_tags.sort(key=lambda x: x['name'])
+                    
+                    for tag in all_tags:
+                        writer.writerow([
+                            tag['name'],
+                            tag['lat'],
+                            tag['lon'],
+                            tag['notes']
+                        ])
+                except Exception as e:
+                    logger.warning(f"Could not export stored locations: {e}")
+                    writer.writerow(['Error loading stored locations', '', '', str(e)])
             
             messagebox.showinfo("Success", f"Analysis exported to:\n{file_path}")
             logger.info(f"Exported analysis to CSV: {file_path}")
@@ -555,6 +611,12 @@ class AnalysisWindow(ctk.CTkToplevel):
     
     def show_aggregate_stats(self):
         """Show aggregate statistics in the details panel."""
+        # Clear current project tracking
+        self.current_project = None
+        
+        # Reset the details label to show no specific project
+        self.details_label.configure(text="Aggregate Statistics")
+        
         # Clear previous details
         for widget in self.details_scroll.winfo_children():
             widget.destroy()
@@ -708,8 +770,11 @@ class AnalysisWindow(ctk.CTkToplevel):
             self.location_tags.set_tag(lat, lon, name, notes)
             messagebox.showinfo("Success", "Location tag saved!")
             dialog.destroy()
-            # Refresh the aggregate statistics view
-            self.show_aggregate_stats()
+            # Refresh the current view (project details or aggregate stats)
+            if self.current_project:
+                self.show_project_details(self.current_project)
+            else:
+                self.show_aggregate_stats()
         
         def delete_tag():
             if tag:
@@ -717,8 +782,11 @@ class AnalysisWindow(ctk.CTkToplevel):
                     self.location_tags.delete_tag(lat, lon)
                     messagebox.showinfo("Success", "Location tag deleted!")
                     dialog.destroy()
-                    # Refresh the aggregate statistics view
-                    self.show_aggregate_stats()
+                    # Refresh the current view (project details or aggregate stats)
+                    if self.current_project:
+                        self.show_project_details(self.current_project)
+                    else:
+                        self.show_aggregate_stats()
             else:
                 messagebox.showinfo("Info", "No tag to delete")
         
@@ -781,6 +849,9 @@ class AnalysisWindow(ctk.CTkToplevel):
     
     def show_project_details(self, project):
         """Show detailed information for a selected project."""
+        # Track the current project for refresh after tag edits
+        self.current_project = project
+        
         # Update details label with project name
         self.details_label.configure(text=f"Project Details - {project['name']}")
         
