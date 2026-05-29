@@ -621,7 +621,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             messagebox.showerror("Error", f"Failed to open sky atlas: {str(e)}")
     
     def open_image_preview(self, project: dict, object_name: str):
-        """Open image preview window for the first light frame of this object."""
+        """Open image preview window with stacked preview of first 20 light frames."""
         try:
             # Get project path
             project_path = Path(project['path'])
@@ -631,28 +631,31 @@ class AnalysisWindow(ctk.CTkToplevel):
                 messagebox.showwarning("No Images", "Lights folder not found for this project.")
                 return
             
-            # Find the first light frame matching this object name
-            # Look for FITS files that contain the object name in filename
+            # Find light frames matching this object name
             fits_files = list(lights_folder.glob('*.fits')) + list(lights_folder.glob('*.FIT'))
             
-            # Try to find a file matching the object name first
-            image_file = None
+            # Filter files matching object name, or use all if no match
+            matching_files = []
             for fits_file in fits_files:
                 if object_name.lower() in fits_file.name.lower():
-                    image_file = fits_file
-                    break
+                    matching_files.append(fits_file)
             
-            # If no match, just take the first light file
-            if not image_file and fits_files:
-                image_file = fits_files[0]
+            # If no matches, use all files
+            if not matching_files:
+                matching_files = fits_files
             
-            if not image_file:
+            if not matching_files:
                 messagebox.showwarning("No Images", "No FITS files found for this project.")
                 return
             
-            # Open preview window
-            PreviewWindow(self, image_file)
-            logger.info(f"Opened preview for {image_file.name}")
+            # Take first 20 images for stacking preview
+            MAX_STACK = 20
+            primary_image = matching_files[0]
+            stack_paths = matching_files[1:MAX_STACK] if len(matching_files) > 1 else []
+            
+            # Open preview window with stacking
+            PreviewWindow(self, primary_image, stack_paths)
+            logger.info(f"Opened stacked preview for {object_name}: {len(stack_paths) + 1} images")
             
         except Exception as e:
             logger.error(f"Failed to open image preview: {e}")
