@@ -35,7 +35,7 @@ class SeestarApp(ctk.CTk):
         super().__init__()
         
         self.title("Seestar FITS Organizer")
-        self.geometry("1000x700")
+        self.geometry("1200x800")
         
         # Directory paths
         self.seestar_dir = None
@@ -72,198 +72,148 @@ class SeestarApp(ctk.CTk):
         """Enable or disable all UI buttons during processing."""
         state = "normal" if enabled else "disabled"
         
-        self.scan_button.configure(state=state)
-        self.analyze_button.configure(state=state)
-        self.settings_button.configure(state=state)
-        self.seestar_button.configure(state=state)
-        self.raw_button.configure(state=state)
-        self.projects_button.configure(state=state)
-        self.analyze_projects_button.configure(state=state)
+        # Directory browse buttons
+        if hasattr(self, 'seestar_button'):
+            self.seestar_button.configure(state=state)
+        if hasattr(self, 'raw_button'):
+            self.raw_button.configure(state=state)
+        if hasattr(self, 'projects_button'):
+            self.projects_button.configure(state=state)
+        if hasattr(self, 'analyze_projects_button'):
+            self.analyze_projects_button.configure(state=state)
+        
+        # Mode action buttons
+        if hasattr(self, 'scan_build_action_btn'):
+            self.scan_build_action_btn.configure(state=state)
+        if hasattr(self, 'analyze_action_btn'):
+            self.analyze_action_btn.configure(state=state)
     
     def setup_ui(self):
         """Setup the user interface."""
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
-        # Main container - horizontal split
-        main_frame = ctk.CTkFrame(self)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # Main container - no padding, tight layout
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
-        # Title with settings button
-        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        title_frame.pack(fill="x", pady=(0, 20))
-        
-        title_label = ctk.CTkLabel(
-            title_frame, 
-            text="Seestar FITS Organizer",
-            font=ctk.CTkFont(size=24, weight="bold")
+        # Menu buttons packed directly into main_frame (no menu_frame wrapper)
+        # File Menu
+        file_menu_btn = ctk.CTkButton(
+            main_frame,
+            text="📁 File",
+            font=ctk.CTkFont(size=12),
+            width=80,
+            command=self.show_file_menu
         )
-        title_label.pack(side="left")
+        file_menu_btn.pack(side="top", anchor="w", padx=10, pady=(5, 0))
         
-        self.settings_button = ctk.CTkButton(
-            title_frame,
-            text="⚙️",
-            font=ctk.CTkFont(size=20),
-            width=40,
-            height=40,
-            command=self.open_settings
+        # Tools Menu
+        tools_menu_btn = ctk.CTkButton(
+            main_frame,
+            text="🔧 Tools",
+            font=ctk.CTkFont(size=12),
+            width=80,
+            command=self.show_tools_menu
         )
-        self.settings_button.pack(side="right")
+        tools_menu_btn.place(x=100, y=5)
         
-        # Content frame - horizontal split: left (controls) and right (console)
-        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, pady=(0, 20))
-        content_frame.grid_columnconfigure(0, weight=1)
-        content_frame.grid_columnconfigure(1, weight=2)
-        
-        # Left panel - Controls
-        left_panel = ctk.CTkFrame(content_frame)
-        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        
-        # Scan & Build Projects Section
-        scan_build_frame = ctk.CTkFrame(left_panel)
-        scan_build_frame.pack(fill="x", pady=(0, 20))
-        
-        scan_build_label = ctk.CTkLabel(scan_build_frame, text="Scan & Build Projects", font=ctk.CTkFont(size=16, weight="bold"))
-        scan_build_label.pack(anchor="w", padx=10, pady=(10, 10))
-        
-        # Workflow Selection
-        workflow_label = ctk.CTkLabel(scan_build_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
-        workflow_label.pack(anchor="w", padx=10, pady=(0, 5))
-        
-        workflow_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
-        workflow_button_frame.pack(fill="x", padx=10, pady=(0, 10))
-        
-        self.direct_radio = ctk.CTkRadioButton(
-            workflow_button_frame,
-            text="Direct (Seestar → Projects)",
-            variable=self.workflow_var,
-            value="direct",
-            command=self.toggle_workflow
+        # Settings Button (direct)
+        settings_btn = ctk.CTkButton(
+            main_frame,
+            text="⚙️ Settings",
+            font=ctk.CTkFont(size=12),
+            width=100,
+            command=lambda: self.show_mode('settings')
         )
-        self.direct_radio.pack(side="left", padx=(0, 20))
+        settings_btn.place(x=190, y=5)
         
-        self.intermediate_radio = ctk.CTkRadioButton(
-            workflow_button_frame,
-            text="Intermediate (Seestar → Raw → Projects)",
-            variable=self.workflow_var,
-            value="intermediate",
-            command=self.toggle_workflow
+        # Help Menu
+        help_menu_btn = ctk.CTkButton(
+            main_frame,
+            text="❓ Help",
+            font=ctk.CTkFont(size=12),
+            width=80,
+            command=self.show_help_menu
         )
-        self.intermediate_radio.pack(side="left")
-        self.direct_radio.select()
+        help_menu_btn.place(x=300, y=5)
         
-        # Workflow explanation
-        self.workflow_explanation = ctk.CTkLabel(
-            scan_build_frame,
-            text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory).",
-            font=ctk.CTkFont(size=11),
-            text_color="gray",
-            wraplength=900
+        # Exit Button (right-aligned)
+        exit_btn = ctk.CTkButton(
+            main_frame,
+            text="❌ Exit",
+            font=ctk.CTkFont(size=12),
+            width=80,
+            command=self.quit
         )
-        self.workflow_explanation.pack(anchor="w", padx=10, pady=(0, 10))
+        exit_btn.place(relx=1.0, x=-90, y=5)
         
-        # Seestar Device Directory (common to both workflows)
-        seestar_label = ctk.CTkLabel(scan_build_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
-        seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
+        # Initialize mode tracking
+        self.current_mode = None  # None, 'scan_build', 'analyze', or 'settings'
         
-        seestar_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
-        seestar_button_frame.pack(fill="x", padx=10, pady=(5, 10))
+        # Content frame - main container for all views
+        self.content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        self.content_frame.pack(fill="both", expand=True, pady=0)
+        self.content_frame.grid_columnconfigure(0, weight=2)
+        self.content_frame.grid_columnconfigure(1, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=1)
         
-        self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="gray")
-        self.seestar_path_label.pack(side="left", padx=(0, 10))
+        # Normal mode panel (left side - for scan/build and analyze)
+        self.left_panel = ctk.CTkFrame(self.content_frame)
+        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         
-        self.seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
-        self.seestar_button.pack(side="right")
+        # Create mode frames (hidden initially)
+        self._create_scan_build_frame()
+        self._create_analyze_frame()
         
-        # Raw Directory Section - Created but NOT packed (shown only in intermediate mode)
-        self.raw_section_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
+        # Default/Welcome frame
+        self.welcome_frame = ctk.CTkFrame(self.left_panel)
+        self.welcome_frame.pack(fill="both", expand=True)
         
-        raw_label = ctk.CTkLabel(self.raw_section_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
-        raw_label.pack(anchor="w", pady=(10, 0))
-        
-        raw_button_frame = ctk.CTkFrame(self.raw_section_frame, fg_color="transparent")
-        raw_button_frame.pack(fill="x", pady=(5, 10))
-        
-        self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="gray")
-        self.raw_path_label.pack(side="left", padx=(0, 10))
-        
-        self.raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
-        self.raw_button.pack(side="right")
-        
-        # Projects Directory (for scan & build) - This gets packed AFTER Seestar and Raw
-        self.projects_label = ctk.CTkLabel(scan_build_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
-        self.projects_label.pack(anchor="w", padx=10, pady=(10, 0))
-        
-        projects_button_frame = ctk.CTkFrame(scan_build_frame, fg_color="transparent")
-        projects_button_frame.pack(fill="x", padx=10, pady=(5, 10))
-        
-        self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="gray")
-        self.projects_path_label.pack(side="left", padx=(0, 10))
-        
-        self.projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
-        self.projects_button.pack(side="right")
-        
-        # Scan & Build Button
-        self.scan_button = ctk.CTkButton(
-            scan_build_frame, 
-            text="🔭 Scan & Build Projects",
-            command=self.start_scan,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
+        welcome_title = ctk.CTkLabel(
+            self.welcome_frame,
+            text="Welcome to Seestar FITS Organizer",
+            font=ctk.CTkFont(size=18, weight="bold")
         )
-        self.scan_button.pack(fill="x", padx=10, pady=(10, 10))
+        welcome_title.pack(pady=(50, 20))
         
-        # Analyze Projects Section
-        analyze_frame = ctk.CTkFrame(left_panel)
-        analyze_frame.pack(fill="x", pady=(0, 20))
-        
-        analyze_label = ctk.CTkLabel(analyze_frame, text="Analyze Existing Projects", font=ctk.CTkFont(size=16, weight="bold"))
-        analyze_label.pack(anchor="w", padx=10, pady=(10, 10))
-        
-        # Projects Directory (for analysis)
-        analyze_projects_label = ctk.CTkLabel(analyze_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
-        analyze_projects_label.pack(anchor="w", padx=10, pady=(0, 5))
-        
-        analyze_projects_button_frame = ctk.CTkFrame(analyze_frame, fg_color="transparent")
-        analyze_projects_button_frame.pack(fill="x", padx=10, pady=(0, 10))
-        
-        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color="gray")
-        self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
-        
-        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100)
-        self.analyze_projects_button.pack(side="right")
-        
-        # Analyze Button
-        self.analyze_button = ctk.CTkButton(
-            analyze_frame,
-            text="🪐 Analyze Existing Projects",
-            command=self.start_analysis,
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
+        welcome_text = ctk.CTkLabel(
+            self.welcome_frame,
+            text="Select a mode from the menu above to get started:\n\n"
+                 "📁 File → 🔭 Scan & Build Projects\n"
+                 "📁 File → 🪐 Analyze Projects\n"
+                 "⚙️ Settings → Configure app settings",
+            font=ctk.CTkFont(size=12),
+            text_color="gray"
         )
-        self.analyze_button.pack(fill="x", padx=10, pady=(0, 10))
+        welcome_text.pack(pady=20)
         
-        # Progress Frame
-        progress_frame = ctk.CTkFrame(left_panel)
-        progress_frame.pack(fill="x", pady=(0, 20))
+        # Progress Frame (always visible at bottom of left panel)
+        self.progress_frame = ctk.CTkFrame(self.left_panel)
+        self.progress_frame.pack(fill="x", side="bottom", pady=(10, 0))
         
-        self.progress_label = ctk.CTkLabel(progress_frame, text="Ready", text_color="gray")
+        self.progress_label = ctk.CTkLabel(self.progress_frame, text="Ready", text_color="gray")
         self.progress_label.pack(anchor="w", padx=10, pady=(10, 10))
         
         # Right panel - Console Output
-        right_panel = ctk.CTkFrame(content_frame)
-        right_panel.grid(row=0, column=1, sticky="nsew")
+        self.right_panel = ctk.CTkFrame(self.content_frame)
+        self.right_panel.grid(row=0, column=1, sticky="nsew")
         
-        console_label = ctk.CTkLabel(right_panel, text="Console Output", font=ctk.CTkFont(size=14, weight="bold"))
+        console_label = ctk.CTkLabel(self.right_panel, text="Console Output", font=ctk.CTkFont(size=14, weight="bold"))
         console_label.pack(anchor="w", padx=10, pady=(10, 5))
         
-        self.console_text = ctk.CTkTextbox(right_panel)
+        self.console_text = ctk.CTkTextbox(self.right_panel)
         self.console_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.console_text.configure(state="disabled")
         
+        # Settings frame - full width (spans both columns)
+        self._create_settings_frame()
+        
         # Redirect logging to console
         self.setup_console_logging()
+        
+        # Bind click to close menus when clicking outside them
+        self.bind("<Button-1>", self.close_menus_on_click)
     
     def setup_console_logging(self):
         """Setup custom logging handler to redirect output to console."""
@@ -563,6 +513,483 @@ class SeestarApp(ctk.CTk):
         """Open the settings dialog."""
         location_tags = LocationTags()
         SettingsWindow(self, self.settings, location_tags)
+    
+    def _create_scan_build_frame(self):
+        """Create Scan & Build mode frame (hidden initially)."""
+        self.scan_build_frame = ctk.CTkFrame(self.left_panel)
+        
+        # Store references to frame widgets
+        self.scan_build_widgets = {}
+        
+        scan_build_label = ctk.CTkLabel(self.scan_build_frame, text="Scan & Build Projects", font=ctk.CTkFont(size=16, weight="bold"))
+        scan_build_label.pack(anchor="w", padx=10, pady=(10, 10))
+        
+        # Workflow Selection
+        workflow_label = ctk.CTkLabel(self.scan_build_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
+        workflow_label.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        workflow_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
+        workflow_button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.direct_radio = ctk.CTkRadioButton(
+            workflow_button_frame,
+            text="Direct (Seestar → Projects)",
+            variable=self.workflow_var,
+            value="direct",
+            command=self.toggle_workflow
+        )
+        self.direct_radio.pack(side="left", padx=(0, 20))
+        
+        self.intermediate_radio = ctk.CTkRadioButton(
+            workflow_button_frame,
+            text="Intermediate (Seestar → Raw → Projects)",
+            variable=self.workflow_var,
+            value="intermediate",
+            command=self.toggle_workflow
+        )
+        self.intermediate_radio.pack(side="left")
+        self.direct_radio.select()
+        
+        # Workflow explanation
+        self.workflow_explanation = ctk.CTkLabel(
+            self.scan_build_frame,
+            text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory).",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            wraplength=900
+        )
+        self.workflow_explanation.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Seestar Device Directory
+        seestar_label = ctk.CTkLabel(self.scan_build_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
+        seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
+        
+        seestar_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
+        seestar_button_frame.pack(fill="x", padx=10, pady=(5, 10))
+        
+        self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="gray")
+        self.seestar_path_label.pack(side="left", padx=(0, 10))
+        
+        self.seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100)
+        self.seestar_button.pack(side="right")
+        
+        # Raw Directory Section (hidden initially)
+        self.raw_section_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
+        
+        raw_label = ctk.CTkLabel(self.raw_section_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
+        raw_label.pack(anchor="w", pady=(10, 0))
+        
+        raw_button_frame = ctk.CTkFrame(self.raw_section_frame, fg_color="transparent")
+        raw_button_frame.pack(fill="x", pady=(5, 10))
+        
+        self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="gray")
+        self.raw_path_label.pack(side="left", padx=(0, 10))
+        
+        self.raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100)
+        self.raw_button.pack(side="right")
+        
+        # Projects Directory
+        self.projects_label = ctk.CTkLabel(self.scan_build_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        self.projects_label.pack(anchor="w", padx=10, pady=(10, 0))
+        
+        projects_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
+        projects_button_frame.pack(fill="x", padx=10, pady=(5, 10))
+        
+        self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="gray")
+        self.projects_path_label.pack(side="left", padx=(0, 10))
+        
+        self.projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100)
+        self.projects_button.pack(side="right")
+        
+        # Start Button
+        self.scan_build_action_btn = ctk.CTkButton(
+            self.scan_build_frame,
+            text="🔭 Start Scan & Build",
+            command=self.start_scan,
+            height=40,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#1E90FF",
+            hover_color="#4169E1"
+        )
+        self.scan_build_action_btn.pack(fill="x", padx=10, pady=(10, 10))
+    
+    def _create_analyze_frame(self):
+        """Create Analyze mode frame (hidden initially)."""
+        self.analyze_frame = ctk.CTkFrame(self.left_panel)
+        
+        analyze_label = ctk.CTkLabel(self.analyze_frame, text="Analyze Existing Projects", font=ctk.CTkFont(size=16, weight="bold"))
+        analyze_label.pack(anchor="w", padx=10, pady=(10, 10))
+        
+        # Projects Directory (for analysis)
+        analyze_projects_label = ctk.CTkLabel(self.analyze_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        analyze_projects_label.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        analyze_projects_button_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
+        analyze_projects_button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color="gray")
+        self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
+        
+        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100)
+        self.analyze_projects_button.pack(side="right")
+        
+        # Start Button
+        self.analyze_action_btn = ctk.CTkButton(
+            self.analyze_frame,
+            text="🪐 Start Analysis",
+            command=self.start_analysis,
+            height=40,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#2E86AB",
+            hover_color="#1E5F7A"
+        )
+        self.analyze_action_btn.pack(fill="x", padx=10, pady=(10, 10))
+    
+    def _create_settings_frame(self):
+        """Create Settings mode frame (hidden initially)."""
+        self.settings_frame = ctk.CTkFrame(self.content_frame)
+        
+        # Title
+        settings_label = ctk.CTkLabel(self.settings_frame, text="Settings", font=ctk.CTkFont(size=16, weight="bold"))
+        settings_label.pack(anchor="w", padx=20, pady=(15, 10))
+        
+        # Scrollable frame for settings content - fill all available space
+        scroll_frame = ctk.CTkScrollableFrame(self.settings_frame)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        
+        # Location Settings Section
+        location_frame = ctk.CTkFrame(scroll_frame)
+        location_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        location_label = ctk.CTkLabel(location_frame, text="Location Settings", font=ctk.CTkFont(size=14, weight="bold"))
+        location_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Location grouping threshold
+        threshold_label = ctk.CTkLabel(location_frame, text="Location Grouping Threshold (degrees):")
+        threshold_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.settings_threshold_entry = ctk.CTkEntry(location_frame)
+        self.settings_threshold_entry.pack(fill="x", padx=10, pady=(0, 5))
+        self.settings_threshold_entry.insert("0", str(self.settings.get_location_threshold()))
+        
+        threshold_help = ctk.CTkLabel(
+            location_frame,
+            text="Locations within this distance will be grouped together (default: 0.005 ≈ 600 yards)",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Timezone Settings Section
+        timezone_frame = ctk.CTkFrame(scroll_frame)
+        timezone_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        timezone_label = ctk.CTkLabel(timezone_frame, text="Timezone Settings", font=ctk.CTkFont(size=14, weight="bold"))
+        timezone_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        tz_label = ctk.CTkLabel(timezone_frame, text="Display Timezone:")
+        tz_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.settings_timezone_menu = ctk.CTkOptionMenu(
+            timezone_frame,
+            values=["UTC", "PST (UTC-8)", "EST (UTC-5)", "Local"]
+        )
+        self.settings_timezone_menu.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Map timezone setting to menu value
+        tz_setting = self.settings.get_timezone()
+        if tz_setting == "UTC":
+            self.settings_timezone_menu.set("UTC")
+        elif tz_setting == "EST":
+            self.settings_timezone_menu.set("EST (UTC-5)")
+        elif tz_setting == "Local":
+            self.settings_timezone_menu.set("Local")
+        else:
+            self.settings_timezone_menu.set("PST (UTC-8)")
+        
+        # Coordinate Format Section
+        coord_frame = ctk.CTkFrame(scroll_frame)
+        coord_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        coord_label = ctk.CTkLabel(coord_frame, text="Coordinate Format", font=ctk.CTkFont(size=14, weight="bold"))
+        coord_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        coord_menu_label = ctk.CTkLabel(coord_frame, text="RA/DEC Display Format:")
+        coord_menu_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.settings_coord_menu = ctk.CTkOptionMenu(
+            coord_frame,
+            values=["Decimal Degrees", "Hours/Minutes/Seconds (RA) + DMS (DEC)"]
+        )
+        self.settings_coord_menu.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Map coordinate format setting to menu value
+        coord_setting = self.settings.get_coordinate_format()
+        if coord_setting == "hms":
+            self.settings_coord_menu.set("Hours/Minutes/Seconds (RA) + DMS (DEC)")
+        else:
+            self.settings_coord_menu.set("Decimal Degrees")
+        
+        coord_help = ctk.CTkLabel(
+            coord_frame,
+            text="'Hours/Minutes/Seconds' shows RA as HH:MM:SS and DEC as DD:MM:SS",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        coord_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Disclaimer Section
+        disclaimer_frame = ctk.CTkFrame(scroll_frame)
+        disclaimer_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        disclaimer_label = ctk.CTkLabel(disclaimer_frame, text="Disclaimer", font=ctk.CTkFont(size=14, weight="bold"))
+        disclaimer_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Toggle switch for showing disclaimer on startup
+        self.disclaimer_switch = ctk.CTkSwitch(
+            disclaimer_frame,
+            text="Show disclaimer on startup",
+            command=self.toggle_disclaimer
+        )
+        self.disclaimer_switch.pack(anchor="w", padx=10, pady=(5, 5))
+        
+        # Set initial state based on current setting
+        if not self.settings.get_disclaimer_acknowledged():
+            self.disclaimer_switch.select()
+        
+        disclaimer_help = ctk.CTkLabel(
+            disclaimer_frame,
+            text="Toggle ON to show the disclaimer window on next startup",
+            font=ctk.CTkFont(size=10),
+            text_color="gray"
+        )
+        disclaimer_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Save button at bottom
+        save_button = ctk.CTkButton(
+            self.settings_frame,
+            text="💾 Save Settings",
+            command=self.save_main_settings,
+            height=40,
+            fg_color="#1E90FF",
+            hover_color="#4169E1",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        save_button.pack(fill="x", padx=20, pady=(10, 15), side="bottom")
+    
+    def save_main_settings(self):
+        """Save settings from main view."""
+        try:
+            # Save location threshold
+            threshold = float(self.settings_threshold_entry.get())
+            self.settings.set_location_threshold(threshold)
+            
+            # Save timezone
+            tz_value = self.settings_timezone_menu.get()
+            if "UTC" in tz_value:
+                self.settings.set_timezone("UTC")
+            elif "EST" in tz_value:
+                self.settings.set_timezone("EST")
+            elif "Local" in tz_value:
+                self.settings.set_timezone("Local")
+            else:
+                self.settings.set_timezone("PST")
+            
+            # Save coordinate format
+            coord_value = self.settings_coord_menu.get()
+            if "Hours/Minutes/Seconds" in coord_value:
+                self.settings.set_coordinate_format("hms")
+            else:
+                self.settings.set_coordinate_format("degrees")
+            
+            messagebox.showinfo("Success", "Settings saved successfully!")
+            logger.info("Settings saved from main view")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {str(e)}")
+    
+    def toggle_disclaimer(self):
+        """Toggle the disclaimer acknowledgment based on switch state."""
+        # Switch is ON (not acknowledged = show on startup)
+        if self.disclaimer_switch.get():
+            self.settings.set_disclaimer_acknowledged(False)
+        # Switch is OFF (acknowledged = don't show)
+        else:
+            self.settings.set_disclaimer_acknowledged(True)
+    
+    def show_mode(self, mode):
+        """Switch to specified mode view."""
+        self.current_mode = mode
+        
+        if mode == 'settings':
+            # Hide normal mode panels, show settings full width
+            self.left_panel.grid_forget()
+            self.right_panel.grid_forget()
+            self.settings_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=20, pady=10)
+            self.progress_label.configure(text="Settings mode - configure app settings and click Save")
+            
+            # Refresh disclaimer switch state (may have changed via disclaimer dialog)
+            if not self.settings.get_disclaimer_acknowledged():
+                self.disclaimer_switch.select()
+            else:
+                self.disclaimer_switch.deselect()
+        else:
+            # Hide settings, show normal layout
+            self.settings_frame.grid_forget()
+            self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+            self.right_panel.grid(row=0, column=1, sticky="nsew")
+            
+            # Hide all content frames in left panel
+            self.welcome_frame.pack_forget()
+            self.scan_build_frame.pack_forget()
+            self.analyze_frame.pack_forget()
+            
+            if mode == 'scan_build':
+                self.scan_build_frame.pack(fill="both", expand=True)
+                self.progress_label.configure(text="Scan & Build mode - configure directories and click Start")
+            elif mode == 'analyze':
+                self.analyze_frame.pack(fill="both", expand=True)
+                self.progress_label.configure(text="Analysis mode - select projects directory and click Start")
+            else:
+                self.welcome_frame.pack(fill="both", expand=True)
+                self.progress_label.configure(text="Ready")
+    
+    def destroy_all_menus(self):
+        """Destroy all open menus."""
+        for attr in ['_file_menu', '_tools_menu', '_help_menu']:
+            if hasattr(self, attr):
+                menu = getattr(self, attr)
+                if menu and menu.winfo_exists():
+                    menu.destroy()
+                setattr(self, attr, None)
+    
+    def close_menus_on_click(self, event):
+        """Close all menus when clicking outside them."""
+        # Only close if not clicking on menu buttons (let button handlers manage that)
+        widget = event.widget
+        widget_class = widget.winfo_class()
+        # Don't close if clicking on a button
+        if widget_class == 'Button' or 'button' in str(widget).lower():
+            return
+        
+        for attr in ['_file_menu', '_tools_menu', '_help_menu']:
+            if hasattr(self, attr):
+                menu = getattr(self, attr)
+                if menu and menu.winfo_exists():
+                    menu.destroy()
+                    setattr(self, attr, None)
+    
+    def show_file_menu(self):
+        """Show File menu dropdown."""
+        # Destroy existing menu if open
+        if hasattr(self, '_file_menu') and self._file_menu and self._file_menu.winfo_exists():
+            self._file_menu.destroy()
+            self._file_menu = None
+            return
+        
+        # Close any other open menus
+        self.destroy_all_menus()
+        
+        self._file_menu = ctk.CTkToplevel(self)
+        menu = self._file_menu
+        # Position below File button (y + 40 to be below the button)
+        menu.geometry(f"200x90+{self.winfo_x() + 20}+{self.winfo_y() + 45}")
+        menu.overrideredirect(True)
+        menu.transient(self)
+        menu.lift()
+        
+        def close_menu():
+            if hasattr(self, '_file_menu') and self._file_menu and self._file_menu.winfo_exists():
+                self._file_menu.destroy()
+            self._file_menu = None
+        
+        def scan_and_close():
+            close_menu()
+            self.lift()
+            self.after(100, lambda: self.show_mode('scan_build'))
+        
+        def analyze_and_close():
+            close_menu()
+            self.lift()
+            self.after(100, lambda: self.show_mode('analyze'))
+        
+        ctk.CTkButton(menu, text="🔭 Scan & Build Projects", 
+                     command=scan_and_close).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(menu, text="🪐 Analyze Projects", 
+                     command=analyze_and_close).pack(fill="x", padx=10, pady=5)
+        
+        # Close on Escape
+        menu.bind("<Escape>", lambda e: close_menu())
+        menu.focus_set()
+    
+    def show_tools_menu(self):
+        """Show Tools menu dropdown."""
+        if hasattr(self, '_tools_menu') and self._tools_menu and self._tools_menu.winfo_exists():
+            self._tools_menu.destroy()
+            self._tools_menu = None
+            return
+        
+        self.destroy_all_menus()
+        
+        self._tools_menu = ctk.CTkToplevel(self)
+        menu = self._tools_menu
+        # Position below Tools button (y + 40 to be below the button)
+        menu.geometry(f"200x60+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
+        menu.overrideredirect(True)
+        menu.transient(self)
+        menu.lift()
+        
+        def close_menu():
+            if hasattr(self, '_tools_menu') and self._tools_menu and self._tools_menu.winfo_exists():
+                self._tools_menu.destroy()
+            self._tools_menu = None
+        
+        ctk.CTkLabel(menu, text="No tools available", text_color="gray").pack(pady=15)
+        
+        menu.bind("<Escape>", lambda e: close_menu())
+        menu.focus_set()
+    
+    def show_help_menu(self):
+        """Show Help menu dropdown."""
+        if hasattr(self, '_help_menu') and self._help_menu and self._help_menu.winfo_exists():
+            self._help_menu.destroy()
+            self._help_menu = None
+            return
+        
+        self.destroy_all_menus()
+        
+        self._help_menu = ctk.CTkToplevel(self)
+        menu = self._help_menu
+        # Position below Help button (y + 40 to be below the button)
+        menu.geometry(f"150x60+{self.winfo_x() + 310}+{self.winfo_y() + 45}")
+        menu.overrideredirect(True)
+        menu.transient(self)
+        menu.lift()
+        
+        def close_menu():
+            if hasattr(self, '_help_menu') and self._help_menu and self._help_menu.winfo_exists():
+                self._help_menu.destroy()
+            self._help_menu = None
+        
+        def about_and_close():
+            close_menu()
+            self.lift()
+            self.after(100, self.show_about)
+        
+        ctk.CTkButton(menu, text="ℹ️ About", 
+                     command=about_and_close).pack(fill="x", padx=10, pady=5)
+        
+        menu.bind("<Escape>", lambda e: close_menu())
+        menu.focus_set()
+    
+    def show_about(self):
+        """Show about dialog."""
+        messagebox.showinfo(
+            "About",
+            "Seestar FITS Organizer\n\n"
+            "A tool for organizing astrophotography data\n"
+            "from Seestar telescopes.\n\n"
+            "Version: 1.2"
+        )
     
     def toggle_workflow(self):
         """Toggle between direct and intermediate workflow."""
