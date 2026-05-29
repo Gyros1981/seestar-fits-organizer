@@ -23,7 +23,7 @@ import shutil
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
 
 # Import UI components
-from ui import DisclaimerWindow, FolderSelectionWindow, SettingsWindow, AnalysisWindow
+from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow
 
 logger = logging.getLogger(__name__)
 
@@ -513,11 +513,6 @@ class SeestarApp(ctk.CTk):
         location_tags = LocationTags()
         AnalysisWindow(self, results, self.settings, location_tags)
     
-    def open_settings(self):
-        """Open the settings dialog."""
-        location_tags = LocationTags()
-        SettingsWindow(self, self.settings, location_tags)
-    
     def _create_scan_build_frame(self):
         """Create Scan & Build mode frame (hidden initially)."""
         self.scan_build_frame = ctk.CTkFrame(self.left_panel)
@@ -713,13 +708,6 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Directory with FITS Files")
         if directory:
             self.load_fits_directory(directory)
-    
-    def go_to_parent_directory(self):
-        """Navigate to parent directory."""
-        if self.current_fits_directory:
-            parent = Path(self.current_fits_directory).parent
-            if parent.exists():
-                self.load_fits_directory(str(parent))
     
     def load_fits_directory(self, directory):
         """Load FITS files from a directory."""
