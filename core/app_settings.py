@@ -44,6 +44,7 @@ class AppSettings:
             'timezone': 'UTC',  # UTC, PST, EST, or Local
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
+            'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
         }
         
         self._load_settings()
@@ -144,3 +145,18 @@ class AppSettings:
         if format_type in ['degrees', 'hms']:
             self.settings['coordinate_format'] = format_type
             self._save_settings()
+    
+    def get_text_scale(self) -> float:
+        """Get the UI text scale factor."""
+        return self.settings.get('text_scale', 1.0)
+    
+    def set_text_scale(self, scale: float):
+        """Set the UI text scale factor.
+        
+        Args:
+            scale: Scale factor between 0.8 and 1.4
+        """
+        # Clamp to valid range
+        scale = max(0.8, min(1.4, scale))
+        self.settings['text_scale'] = scale
+        self._save_settings()

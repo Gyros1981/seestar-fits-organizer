@@ -73,6 +73,22 @@ class SeestarApp(ctk.CTk):
         """Show the disclaimer window."""
         DisclaimerWindow(self, self.settings)
     
+    def get_font(self, size: int, weight: str = None):
+        """Get a CTkFont with text scaling applied.
+        
+        Args:
+            size: Base font size
+            weight: Font weight (e.g., 'bold', 'normal')
+            
+        Returns:
+            CTkFont with scaled size
+        """
+        scale = self.settings.get_text_scale()
+        scaled_size = int(size * scale)
+        if weight:
+            return ctk.CTkFont(size=scaled_size, weight=weight)
+        return ctk.CTkFont(size=scaled_size)
+    
     def set_ui_state(self, enabled: bool):
         """Enable or disable all UI buttons during processing."""
         state = "normal" if enabled else "disabled"
@@ -103,41 +119,51 @@ class SeestarApp(ctk.CTk):
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
         # Menu buttons packed directly into main_frame (no menu_frame wrapper)
+        # Home Button (leftmost)
+        home_btn = ctk.CTkButton(
+            main_frame,
+            text="🏠",
+            font=self.get_font(14),
+            width=40,
+            command=lambda: self.show_mode('welcome')
+        )
+        home_btn.place(x=5, y=5)
+        
         # Import Menu (for transferring files from Seestar)
         import_menu_btn = ctk.CTkButton(
             main_frame,
-            text="� Import",
-            font=ctk.CTkFont(size=12),
+            text="📥 Import",
+            font=self.get_font(12),
             width=80,
             command=self.show_import_menu
         )
-        import_menu_btn.pack(side="top", anchor="w", padx=10, pady=(5, 0))
+        import_menu_btn.place(x=50, y=5)
         
         # Tools Menu
         tools_menu_btn = ctk.CTkButton(
             main_frame,
             text="🔧 Tools",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             width=80,
             command=self.show_tools_menu
         )
-        tools_menu_btn.place(x=100, y=5)
+        tools_menu_btn.place(x=135, y=5)
         
         # Settings Button (direct)
         settings_btn = ctk.CTkButton(
             main_frame,
             text="⚙️ Settings",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             width=100,
             command=lambda: self.show_mode('settings')
         )
-        settings_btn.place(x=190, y=5)
+        settings_btn.place(x=220, y=5)
         
         # Help Menu
         help_menu_btn = ctk.CTkButton(
             main_frame,
             text="❓ Help",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             width=80,
             command=self.show_help_menu
         )
@@ -147,7 +173,7 @@ class SeestarApp(ctk.CTk):
         exit_btn = ctk.CTkButton(
             main_frame,
             text="❌ Exit",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             width=80,
             fg_color="#C0392B",
             hover_color="#A93226",
@@ -181,7 +207,7 @@ class SeestarApp(ctk.CTk):
         welcome_title = ctk.CTkLabel(
             self.welcome_frame,
             text="Welcome to Seestar FITS Organizer",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=self.get_font(24, weight="bold")
         )
         welcome_title.pack(pady=(50, 20))
         
@@ -194,7 +220,7 @@ class SeestarApp(ctk.CTk):
                  "🔧 Tools → 🪐 Analyze Projects\n"
                  "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
-            font=ctk.CTkFont(size=16),
+            font=self.get_font(16),
             text_color="gray"
         )
         welcome_text.pack(pady=20)
@@ -210,7 +236,7 @@ class SeestarApp(ctk.CTk):
         self.right_panel = ctk.CTkFrame(self.content_frame)
         self.right_panel.grid(row=0, column=1, sticky="nsew")
         
-        console_label = ctk.CTkLabel(self.right_panel, text="Console Output", font=ctk.CTkFont(size=14, weight="bold"))
+        console_label = ctk.CTkLabel(self.right_panel, text="Console Output", font=self.get_font(14, weight="bold"))
         console_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         self.console_text = ctk.CTkTextbox(self.right_panel)
@@ -630,14 +656,14 @@ class SeestarApp(ctk.CTk):
         self.scan_build_widgets = {}
         
         # Dynamic title (updated based on workflow mode)
-        self.scan_build_title = ctk.CTkLabel(self.scan_build_frame, text="Direct Copy", font=ctk.CTkFont(size=16, weight="bold"))
+        self.scan_build_title = ctk.CTkLabel(self.scan_build_frame, text="Direct Copy", font=self.get_font(16, weight="bold"))
         self.scan_build_title.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Dynamic explanation (updated based on workflow mode)
         self.scan_build_explanation = ctk.CTkLabel(
             self.scan_build_frame,
             text="Copy FITS files directly from Seestar device to project folders. This mode skips the intermediate Raw directory.",
-            font=ctk.CTkFont(size=13),
+            font=self.get_font(13),
             text_color="gray",
             wraplength=900,
             justify="left"
@@ -645,7 +671,7 @@ class SeestarApp(ctk.CTk):
         self.scan_build_explanation.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Seestar Device Directory
-        seestar_label = ctk.CTkLabel(self.scan_build_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
+        seestar_label = ctk.CTkLabel(self.scan_build_frame, text="Seestar MyWork Directory:", font=self.get_font(13, weight="bold"))
         seestar_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         seestar_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
@@ -660,7 +686,7 @@ class SeestarApp(ctk.CTk):
         # Raw Directory Section (hidden initially)
         self.raw_section_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
         
-        raw_label = ctk.CTkLabel(self.raw_section_frame, text="Raw Directory (Intermediate):", font=ctk.CTkFont(weight="bold"))
+        raw_label = ctk.CTkLabel(self.raw_section_frame, text="Raw Directory (Intermediate):", font=self.get_font(13, weight="bold"))
         raw_label.pack(anchor="w", pady=(10, 0))
         
         raw_button_frame = ctk.CTkFrame(self.raw_section_frame, fg_color="transparent")
@@ -673,7 +699,7 @@ class SeestarApp(ctk.CTk):
         self.raw_button.pack(side="right")
         
         # Projects Directory
-        self.projects_label = ctk.CTkLabel(self.scan_build_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        self.projects_label = ctk.CTkLabel(self.scan_build_frame, text="Projects Directory:", font=self.get_font(13, weight="bold"))
         self.projects_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         projects_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
@@ -691,7 +717,7 @@ class SeestarApp(ctk.CTk):
             text="🔭 Start Import",
             command=self.start_scan,
             height=40,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             fg_color="#E67E22",
             hover_color="#D35400"
         )
@@ -701,11 +727,11 @@ class SeestarApp(ctk.CTk):
         """Create Analyze mode frame (hidden initially)."""
         self.analyze_frame = ctk.CTkFrame(self.left_panel)
         
-        analyze_label = ctk.CTkLabel(self.analyze_frame, text="Analyze Existing Projects", font=ctk.CTkFont(size=16, weight="bold"))
+        analyze_label = ctk.CTkLabel(self.analyze_frame, text="Analyze Existing Projects", font=self.get_font(16, weight="bold"))
         analyze_label.pack(anchor="w", padx=10, pady=(10, 10))
         
         # Projects Directory (for analysis)
-        analyze_projects_label = ctk.CTkLabel(self.analyze_frame, text="Projects Directory:", font=ctk.CTkFont(weight="bold"))
+        analyze_projects_label = ctk.CTkLabel(self.analyze_frame, text="Projects Directory:", font=self.get_font(13, weight="bold"))
         analyze_projects_label.pack(anchor="w", padx=10, pady=(0, 5))
         
         analyze_projects_button_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
@@ -723,7 +749,7 @@ class SeestarApp(ctk.CTk):
             text="🪐 Start Analysis",
             command=self.start_analysis,
             height=40,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             fg_color="#E67E22",
             hover_color="#D35400"
         )
@@ -733,7 +759,7 @@ class SeestarApp(ctk.CTk):
         """Create Planetary & Scenery copy mode frame (hidden initially)."""
         self.planetary_scenery_frame = ctk.CTkFrame(self.left_panel)
         
-        ps_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Copy Planetary & Scenery Media", font=ctk.CTkFont(size=16, weight="bold"))
+        ps_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Copy Planetary & Scenery Media", font=self.get_font(16, weight="bold"))
         ps_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         explanation = ctk.CTkLabel(
@@ -746,7 +772,7 @@ class SeestarApp(ctk.CTk):
                  "• Lunar_video, Lunar_photo\n"
                  "• Scenery_video, Scenery_photo\n\n"
                  "Files are only copied if they don't already exist at the destination (matching file size).",
-            font=ctk.CTkFont(size=13),
+            font=self.get_font(13),
             text_color="gray",
             wraplength=900,
             justify="left"
@@ -754,7 +780,7 @@ class SeestarApp(ctk.CTk):
         explanation.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Source: Seestar MyWorks Directory
-        source_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Seestar MyWorks Directory:", font=ctk.CTkFont(weight="bold"))
+        source_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Seestar MyWorks Directory:", font=self.get_font(13, weight="bold"))
         source_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         source_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
@@ -767,7 +793,7 @@ class SeestarApp(ctk.CTk):
         self.ps_source_button.pack(side="right")
         
         # Target: Destination Directory
-        target_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Target Directory:", font=ctk.CTkFont(weight="bold"))
+        target_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Target Directory:", font=self.get_font(13, weight="bold"))
         target_label.pack(anchor="w", padx=10, pady=(10, 0))
         
         target_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
@@ -785,7 +811,7 @@ class SeestarApp(ctk.CTk):
             text="🌙 Copy Planetary & Scenery",
             command=self.start_planetary_scenery_copy,
             height=40,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             fg_color="#E67E22",
             hover_color="#D35400"
         )
@@ -796,7 +822,7 @@ class SeestarApp(ctk.CTk):
         self.fits_viewer_frame = ctk.CTkFrame(self.content_frame)
         
         # Title
-        title_label = ctk.CTkLabel(self.fits_viewer_frame, text="🖼️ FITS Viewer", font=ctk.CTkFont(size=16, weight="bold"))
+        title_label = ctk.CTkLabel(self.fits_viewer_frame, text="🖼️ FITS Viewer", font=self.get_font(16, weight="bold"))
         title_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Directory selection frame
@@ -820,20 +846,20 @@ class SeestarApp(ctk.CTk):
         left_panel = ctk.CTkFrame(content_frame)
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        list_label = ctk.CTkLabel(left_panel, text="FITS Files", font=ctk.CTkFont(size=12, weight="bold"))
+        list_label = ctk.CTkLabel(left_panel, text="FITS Files", font=self.get_font(12, weight="bold"))
         list_label.pack(anchor="w", padx=10, pady=(5, 0))
         
         # Action buttons frame
         action_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
         action_frame.pack(fill="x", padx=5, pady=5)
         
-        self.mark_btn = ctk.CTkButton(action_frame, text="✓ Mark", command=self.toggle_mark_selected, width=80, font=ctk.CTkFont(size=11))
+        self.mark_btn = ctk.CTkButton(action_frame, text="✓ Mark", command=self.toggle_mark_selected, width=80, font=self.get_font(11))
         self.mark_btn.pack(side="left", padx=2)
         
-        self.clear_marks_btn = ctk.CTkButton(action_frame, text="⬜ Clear Marks", command=self.clear_all_marks, width=100, font=ctk.CTkFont(size=11))
+        self.clear_marks_btn = ctk.CTkButton(action_frame, text="⬜ Clear Marks", command=self.clear_all_marks, width=100, font=self.get_font(11))
         self.clear_marks_btn.pack(side="left", padx=2)
         
-        self.delete_marked_btn = ctk.CTkButton(action_frame, text="🗑️ Delete Marked", command=self.delete_marked_fits, width=110, font=ctk.CTkFont(size=11), fg_color="#C0392B", hover_color="#A93226")
+        self.delete_marked_btn = ctk.CTkButton(action_frame, text="🗑️ Delete Marked", command=self.delete_marked_fits, width=110, font=self.get_font(11), fg_color="#C0392B", hover_color="#A93226")
         self.delete_marked_btn.pack(side="right", padx=2)
         
         # File list using tk.Listbox for performance
@@ -866,11 +892,11 @@ class SeestarApp(ctk.CTk):
         right_panel = ctk.CTkFrame(content_frame)
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
-        preview_label = ctk.CTkLabel(right_panel, text="Preview", font=ctk.CTkFont(size=12, weight="bold"))
+        preview_label = ctk.CTkLabel(right_panel, text="Preview", font=self.get_font(12, weight="bold"))
         preview_label.pack(anchor="w", padx=10, pady=(5, 0))
         
         # Filename label (updates when file selected)
-        self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=ctk.CTkFont(size=11), text_color="gray")
+        self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=self.get_font(11), text_color="gray")
         self.fits_preview_filename.pack(anchor="w", padx=10, pady=(0, 5))
         
         self.fits_preview_label = ctk.CTkLabel(right_panel, text="Select a FITS file to preview", text_color="gray")
@@ -1116,7 +1142,7 @@ class SeestarApp(ctk.CTk):
         self.settings_frame = ctk.CTkFrame(self.content_frame)
         
         # Title
-        settings_label = ctk.CTkLabel(self.settings_frame, text="Settings", font=ctk.CTkFont(size=16, weight="bold"))
+        settings_label = ctk.CTkLabel(self.settings_frame, text="Settings", font=self.get_font(16, weight="bold"))
         settings_label.pack(anchor="w", padx=20, pady=(15, 10))
         
         # Scrollable frame for settings content - fill all available space
@@ -1127,7 +1153,7 @@ class SeestarApp(ctk.CTk):
         location_frame = ctk.CTkFrame(scroll_frame)
         location_frame.pack(fill="x", padx=5, pady=(0, 15))
         
-        location_label = ctk.CTkLabel(location_frame, text="Location Settings", font=ctk.CTkFont(size=14, weight="bold"))
+        location_label = ctk.CTkLabel(location_frame, text="Location Settings", font=self.get_font(14, weight="bold"))
         location_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Location grouping threshold
@@ -1141,7 +1167,7 @@ class SeestarApp(ctk.CTk):
         threshold_help = ctk.CTkLabel(
             location_frame,
             text="Locations within this distance will be grouped together (default: 0.005 ≈ 600 yards)",
-            font=ctk.CTkFont(size=10),
+            font=self.get_font(10),
             text_color="gray"
         )
         threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
@@ -1150,7 +1176,7 @@ class SeestarApp(ctk.CTk):
         timezone_frame = ctk.CTkFrame(scroll_frame)
         timezone_frame.pack(fill="x", padx=5, pady=(0, 15))
         
-        timezone_label = ctk.CTkLabel(timezone_frame, text="Timezone Settings", font=ctk.CTkFont(size=14, weight="bold"))
+        timezone_label = ctk.CTkLabel(timezone_frame, text="Timezone Settings", font=self.get_font(14, weight="bold"))
         timezone_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         tz_label = ctk.CTkLabel(timezone_frame, text="Display Timezone:")
@@ -1179,7 +1205,7 @@ class SeestarApp(ctk.CTk):
         coord_frame = ctk.CTkFrame(scroll_frame)
         coord_frame.pack(fill="x", padx=5, pady=(0, 15))
         
-        coord_label = ctk.CTkLabel(coord_frame, text="Coordinate Format", font=ctk.CTkFont(size=14, weight="bold"))
+        coord_label = ctk.CTkLabel(coord_frame, text="Coordinate Format", font=self.get_font(14, weight="bold"))
         coord_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         coord_menu_label = ctk.CTkLabel(coord_frame, text="RA/DEC Display Format:")
@@ -1201,7 +1227,7 @@ class SeestarApp(ctk.CTk):
         coord_help = ctk.CTkLabel(
             coord_frame,
             text="'Hours/Minutes/Seconds' shows RA as HH:MM:SS and DEC as DD:MM:SS",
-            font=ctk.CTkFont(size=10),
+            font=self.get_font(10),
             text_color="gray"
         )
         coord_help.pack(anchor="w", padx=10, pady=(0, 10))
@@ -1210,7 +1236,7 @@ class SeestarApp(ctk.CTk):
         disclaimer_frame = ctk.CTkFrame(scroll_frame)
         disclaimer_frame.pack(fill="x", padx=5, pady=(0, 15))
         
-        disclaimer_label = ctk.CTkLabel(disclaimer_frame, text="Disclaimer", font=ctk.CTkFont(size=14, weight="bold"))
+        disclaimer_label = ctk.CTkLabel(disclaimer_frame, text="Disclaimer", font=self.get_font(14, weight="bold"))
         disclaimer_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Toggle switch for showing disclaimer on startup
@@ -1228,10 +1254,45 @@ class SeestarApp(ctk.CTk):
         disclaimer_help = ctk.CTkLabel(
             disclaimer_frame,
             text="Toggle ON to show the disclaimer window on next startup",
-            font=ctk.CTkFont(size=10),
+            font=self.get_font(10),
             text_color="gray"
         )
         disclaimer_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Text Scale Section
+        text_scale_frame = ctk.CTkFrame(scroll_frame)
+        text_scale_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        text_scale_label = ctk.CTkLabel(text_scale_frame, text="Text Size", font=self.get_font(14, weight="bold"))
+        text_scale_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        text_scale_menu_label = ctk.CTkLabel(text_scale_frame, text="UI Text Scale:")
+        text_scale_menu_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.settings_text_scale_menu = ctk.CTkOptionMenu(
+            text_scale_frame,
+            values=["Small (0.8x)", "Normal (1.0x)", "Large (1.2x)", "Extra Large (1.4x)"]
+        )
+        self.settings_text_scale_menu.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Map text scale setting to menu value
+        scale_setting = self.settings.get_text_scale()
+        if scale_setting <= 0.85:
+            self.settings_text_scale_menu.set("Small (0.8x)")
+        elif scale_setting >= 1.35:
+            self.settings_text_scale_menu.set("Extra Large (1.4x)")
+        elif scale_setting >= 1.15:
+            self.settings_text_scale_menu.set("Large (1.2x)")
+        else:
+            self.settings_text_scale_menu.set("Normal (1.0x)")
+        
+        text_scale_help = ctk.CTkLabel(
+            text_scale_frame,
+            text="Changes take effect after restarting the application",
+            font=self.get_font(10),
+            text_color="gray"
+        )
+        text_scale_help.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Save button at bottom
         save_button = ctk.CTkButton(
@@ -1241,7 +1302,7 @@ class SeestarApp(ctk.CTk):
             height=40,
             fg_color="#E67E22",
             hover_color="#D35400",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=self.get_font(14, weight="bold")
         )
         save_button.pack(fill="x", padx=20, pady=(10, 15), side="bottom")
     
@@ -1271,6 +1332,17 @@ class SeestarApp(ctk.CTk):
                 self.settings.set_coordinate_format("hms")
             else:
                 self.settings.set_coordinate_format("degrees")
+            
+            # Save text scale
+            scale_value = self.settings_text_scale_menu.get()
+            if "0.8" in scale_value:
+                self.settings.set_text_scale(0.8)
+            elif "1.2" in scale_value:
+                self.settings.set_text_scale(1.2)
+            elif "1.4" in scale_value:
+                self.settings.set_text_scale(1.4)
+            else:
+                self.settings.set_text_scale(1.0)
             
             messagebox.showinfo("Success", "Settings saved successfully!")
             logger.info("Settings saved from main view")
@@ -1516,7 +1588,7 @@ class SeestarApp(ctk.CTk):
         """Create About frame (hidden initially)."""
         self.about_frame = ctk.CTkFrame(self.left_panel)
         
-        about_title = ctk.CTkLabel(self.about_frame, text="ℹ️ About", font=ctk.CTkFont(size=22, weight="bold"))
+        about_title = ctk.CTkLabel(self.about_frame, text="ℹ️ About", font=self.get_font(22, weight="bold"))
         about_title.pack(anchor="w", padx=10, pady=(20, 10))
         
         about_text = ctk.CTkLabel(
@@ -1531,7 +1603,7 @@ class SeestarApp(ctk.CTk):
                  "• FITS Viewer - Browse and preview FITS files with arrow key navigation\n\n"
                  "Version: 1.3.2\n"
                  "Created by Guy Ronen",
-            font=ctk.CTkFont(size=16),
+            font=self.get_font(16),
             text_color="gray",
             wraplength=900,
             justify="left"

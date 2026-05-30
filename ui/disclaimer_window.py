@@ -39,6 +39,14 @@ class DisclaimerWindow(ctk.CTkToplevel):
         
         self.setup_ui()
     
+    def get_font(self, size: int, weight: str = None):
+        """Get a CTkFont with text scaling applied."""
+        scale = self.settings.get_text_scale()
+        scaled_size = int(size * scale)
+        if weight:
+            return ctk.CTkFont(size=scaled_size, weight=weight)
+        return ctk.CTkFont(size=scaled_size)
+    
     def setup_ui(self):
         """Setup the disclaimer UI components."""
         # Main container
@@ -49,7 +57,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
         title_label = ctk.CTkLabel(
             main_frame,
             text="⚠️ Disclaimer",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=self.get_font(24, weight="bold")
         )
         title_label.pack(pady=(0, 20))
         
@@ -78,7 +86,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
             main_frame,
             text="Don't show this disclaimer again",
             variable=self.dont_show_again_var,
-            font=ctk.CTkFont(size=12)
+            font=self.get_font(12)
         )
         dont_show_again_checkbox.pack(anchor="w", padx=10, pady=(0, 15))
         
@@ -90,7 +98,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
         tos_button = ctk.CTkButton(
             button_frame,
             text="📄 View Terms of Service",
-            font=ctk.CTkFont(size=14),
+            font=self.get_font(14),
             height=40,
             command=self.show_tos
         )
@@ -100,7 +108,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
         continue_button = ctk.CTkButton(
             button_frame,
             text="Continue to App",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             height=40,
             fg_color="#1E90FF",
             hover_color="#4169E1",
@@ -123,7 +131,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
         title_label = ctk.CTkLabel(
             main_frame,
             text="Terms of Service",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=self.get_font(24, weight="bold")
         )
         title_label.pack(pady=(0, 20))
         
@@ -150,7 +158,7 @@ class DisclaimerWindow(ctk.CTkToplevel):
         close_button = ctk.CTkButton(
             main_frame,
             text="Close",
-            font=ctk.CTkFont(size=14),
+            font=self.get_font(14),
             height=40,
             command=tos_window.destroy
         )

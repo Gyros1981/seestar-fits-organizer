@@ -146,7 +146,16 @@ class AnalysisWindow(ctk.CTkToplevel):
         # Bring window to front
         self.lift()
         self.attributes('-topmost', True)
+    
         self.after(100, lambda: self.attributes('-topmost', False))
+    
+    def get_font(self, size: int, weight: str = None):
+        """Get a CTkFont with text scaling applied."""
+        scale = self.settings.get_text_scale()
+        scaled_size = int(size * scale)
+        if weight:
+            return ctk.CTkFont(size=scaled_size, weight=weight)
+        return ctk.CTkFont(size=scaled_size)
     
     def export_to_csv(self):
         """Export analysis data to CSV file."""
@@ -336,14 +345,14 @@ class AnalysisWindow(ctk.CTkToplevel):
         title_label = ctk.CTkLabel(
             header_frame,
             text="Seestar FITS Organizer - Analysis",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=self.get_font(24, weight="bold")
         )
         title_label.pack(side="left")
         
         export_button = ctk.CTkButton(
             header_frame,
             text="📥 Export to CSV",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             height=40,
             fg_color="#1E90FF",
             hover_color="#4169E1",
@@ -356,7 +365,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             no_data_label = ctk.CTkLabel(
                 main_frame,
                 text="No projects found in the selected directory.\nMake sure you have folders ending with '_Project'.",
-                font=ctk.CTkFont(size=14),
+                font=self.get_font(14),
                 text_color="gray"
             )
             no_data_label.pack(pady=50)
@@ -366,14 +375,14 @@ class AnalysisWindow(ctk.CTkToplevel):
         projects_frame = ctk.CTkFrame(main_frame)
         projects_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
         
-        projects_label = ctk.CTkLabel(projects_frame, text="Projects", font=ctk.CTkFont(size=18, weight="bold"))
+        projects_label = ctk.CTkLabel(projects_frame, text="Projects", font=self.get_font(18, weight="bold"))
         projects_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Search entry
         search_frame = ctk.CTkFrame(projects_frame, fg_color="transparent")
         search_frame.pack(fill="x", padx=10, pady=(0, 5))
         
-        search_label = ctk.CTkLabel(search_frame, text="🔍", font=ctk.CTkFont(size=16))
+        search_label = ctk.CTkLabel(search_frame, text="🔍", font=self.get_font(16))
         search_label.pack(side="left", padx=(0, 5))
         
         self.search_entry = ctk.CTkEntry(
@@ -395,7 +404,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         agg_button = ctk.CTkButton(
             self.scroll_frame,
             text="📊 Aggregate Statistics",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=self.get_font(14, weight="bold"),
             height=40,
             fg_color="#2E8B57",  # Sea green color to differentiate
             hover_color="#3CB371",
@@ -417,7 +426,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         details_frame = ctk.CTkFrame(main_frame)
         details_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
         
-        self.details_label = ctk.CTkLabel(details_frame, text="Project Details", font=ctk.CTkFont(size=18, weight="bold"))
+        self.details_label = ctk.CTkLabel(details_frame, text="Project Details", font=self.get_font(18, weight="bold"))
         self.details_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         self.details_scroll = ctk.CTkScrollableFrame(details_frame)
@@ -427,7 +436,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.no_selection_label = ctk.CTkLabel(
             self.details_scroll,
             text="Click on a project to view details",
-            font=ctk.CTkFont(size=14),
+            font=self.get_font(14),
             text_color="gray"
         )
         self.no_selection_label.pack(pady=50)
@@ -459,13 +468,13 @@ class AnalysisWindow(ctk.CTkToplevel):
             stat_frame.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
             grid_frame.grid_columnconfigure(col, weight=1)
             
-            label_widget = ctk.CTkLabel(stat_frame, text=label, font=ctk.CTkFont(weight="bold"))
+            label_widget = ctk.CTkLabel(stat_frame, text=label, font=self.get_font(12, weight="bold"))
             label_widget.pack(anchor="w", padx=10, pady=(10, 2))
             
             value_widget = ctk.CTkTextbox(stat_frame, height=35)
             value_widget.pack(fill="x", padx=10, pady=(2, 10))
             value_widget.insert("1.0", str(value))
-            value_widget.configure(state="disabled", font=ctk.CTkFont(size=16))
+            value_widget.configure(state="disabled", font=self.get_font(16))
         
         # Integration time
         hours = int(stats['total_integration_hours'])
@@ -473,13 +482,13 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_frame = ctk.CTkFrame(parent)
         time_frame.pack(fill="x", padx=10, pady=(0, 10))
         
-        time_label = ctk.CTkLabel(time_frame, text="Total Integration Time", font=ctk.CTkFont(weight="bold"))
+        time_label = ctk.CTkLabel(time_frame, text="Total Integration Time", font=self.get_font(12, weight="bold"))
         time_label.pack(anchor="w", padx=10, pady=(10, 2))
         
         time_value = ctk.CTkTextbox(time_frame, height=35)
         time_value.pack(fill="x", padx=10, pady=(2, 10))
         time_value.insert("1.0", f"{hours}h {minutes}m")
-        time_value.configure(state="disabled", font=ctk.CTkFont(size=16))
+        time_value.configure(state="disabled", font=self.get_font(16))
         
         # Unique objects and filters
         unique_frame = ctk.CTkFrame(parent)
@@ -491,12 +500,12 @@ class AnalysisWindow(ctk.CTkToplevel):
         objects_textbox = ctk.CTkTextbox(unique_frame, height=30)
         objects_textbox.pack(fill="x", padx=10, pady=(5, 2))
         objects_textbox.insert("1.0", objects_text)
-        objects_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+        objects_textbox.configure(state="disabled", font=self.get_font(14))
         
         filters_textbox = ctk.CTkTextbox(unique_frame, height=30)
         filters_textbox.pack(fill="x", padx=10, pady=(2, 10))
         filters_textbox.insert("1.0", filters_text)
-        filters_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+        filters_textbox.configure(state="disabled", font=self.get_font(14))
         
         # Capture Locations expandable section
         locations_frame = ctk.CTkFrame(parent)
@@ -505,7 +514,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         locations_button = ctk.CTkButton(
             locations_frame,
             text="▶ Capture Locations",
-            font=ctk.CTkFont(weight="bold"),
+            font=self.get_font(12, weight="bold"),
             height=35,
             command=lambda: self.toggle_expandable_section(locations_button, locations_content)
         )
@@ -599,14 +608,14 @@ class AnalysisWindow(ctk.CTkToplevel):
                 location_label = ctk.CTkLabel(
                     header_frame,
                     text=display_name,
-                    font=ctk.CTkFont(size=14, weight="bold")
+                    font=self.get_font(14, weight="bold")
                 )
                 location_label.pack(side="left")
                 
                 count_label = ctk.CTkLabel(
                     header_frame,
                     text=f"{len(group)} projects",
-                    font=ctk.CTkFont(size=12),
+                    font=self.get_font(12),
                     text_color="gray"
                 )
                 count_label.pack(side="right")
@@ -616,21 +625,21 @@ class AnalysisWindow(ctk.CTkToplevel):
                     coord_textbox = ctk.CTkTextbox(loc_card, height=25)
                     coord_textbox.pack(fill="x", padx=10, pady=(0, 5))
                     coord_textbox.insert("1.0", f"Lat: {avg_lat:.6f}, Lon: {avg_lon:.6f}")
-                    coord_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
+                    coord_textbox.configure(state="disabled", font=self.get_font(12))
                 
                 # Objects row
                 if all_objects:
                     obj_textbox = ctk.CTkTextbox(loc_card, height=30)
                     obj_textbox.pack(fill="x", padx=10, pady=(0, 5))
                     obj_textbox.insert("1.0", f"Objects: {', '.join(sorted(all_objects))}")
-                    obj_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
+                    obj_textbox.configure(state="disabled", font=self.get_font(12))
                 
                 # Google Maps button
                 if avg_lat and avg_lon:
                     maps_button = ctk.CTkButton(
                         loc_card,
                         text="🗺️ Open in Google Maps",
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#4285F4",
                         hover_color="#3367D6",
@@ -644,7 +653,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     tag_button = ctk.CTkButton(
                         loc_card,
                         text=tag_button_text,
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#FFA500",
                         hover_color="#FF8C00",
@@ -652,7 +661,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     )
                     tag_button.pack(fill="x", padx=10, pady=(5, 10))
         else:
-            no_loc_label = ctk.CTkLabel(locations_content, text="No capture locations found", font=ctk.CTkFont(size=14))
+            no_loc_label = ctk.CTkLabel(locations_content, text="No capture locations found", font=self.get_font(14))
             no_loc_label.pack(padx=10, pady=10)
     
     def create_project_button(self, parent, project):
@@ -660,7 +669,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         button = ctk.CTkButton(
             parent,
             text=project['name'],
-            font=ctk.CTkFont(size=14),
+            font=self.get_font(14),
             height=40,
             command=lambda: self.show_project_details(project)
         )
@@ -718,7 +727,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         title_label = ctk.CTkLabel(
             self.details_scroll,
             text="Aggregate Statistics",
-            font=ctk.CTkFont(size=20, weight="bold")
+            font=self.get_font(20, weight="bold")
         )
         title_label.pack(anchor="w", padx=10, pady=(10, 5))
         
@@ -835,7 +844,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         dialog.geometry(f"+{x}+{y}")
         
         # Name field
-        name_label = ctk.CTkLabel(dialog, text="Location Name:", font=ctk.CTkFont(weight="bold"))
+        name_label = ctk.CTkLabel(dialog, text="Location Name:", font=self.get_font(13, weight="bold"))
         name_label.pack(anchor="w", padx=20, pady=(20, 5))
         
         name_entry = ctk.CTkEntry(dialog, placeholder_text="e.g., Backyard Observatory")
@@ -844,7 +853,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             name_entry.insert(0, tag['name'])
         
         # Notes field
-        notes_label = ctk.CTkLabel(dialog, text="Notes (optional):", font=ctk.CTkFont(weight="bold"))
+        notes_label = ctk.CTkLabel(dialog, text="Notes (optional):", font=self.get_font(13, weight="bold"))
         notes_label.pack(anchor="w", padx=20, pady=(0, 5))
         
         notes_textbox = ctk.CTkTextbox(dialog, height=100)
@@ -966,7 +975,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         summary_button = ctk.CTkButton(
             summary_frame,
             text="▶ Project Summary",
-            font=ctk.CTkFont(weight="bold"),
+            font=self.get_font(12, weight="bold"),
             height=35,
             command=lambda: self.toggle_expandable_section(summary_button, summary_content)
         )
@@ -980,7 +989,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.expandable_sections.append((summary_button, summary_content))
         
         # Frame counts
-        counts_label = ctk.CTkLabel(summary_content, text="Frame Counts", font=ctk.CTkFont(weight="bold"))
+        counts_label = ctk.CTkLabel(summary_content, text="Frame Counts", font=self.get_font(12, weight="bold"))
         counts_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         counts_text = (
@@ -992,32 +1001,32 @@ class AnalysisWindow(ctk.CTkToplevel):
         counts_value = ctk.CTkTextbox(summary_content, height=30)
         counts_value.pack(fill="x", padx=10, pady=(0, 5))
         counts_value.insert("1.0", counts_text)
-        counts_value.configure(state="disabled", font=ctk.CTkFont(size=14))
+        counts_value.configure(state="disabled", font=self.get_font(14))
         
         # Exposure breakdown for lights
         if project.get('lights_by_exposure'):
-            lights_exp_label = ctk.CTkLabel(summary_content, text="Lights by Exposure:", font=ctk.CTkFont(weight="bold"))
+            lights_exp_label = ctk.CTkLabel(summary_content, text="Lights by Exposure:", font=self.get_font(12, weight="bold"))
             lights_exp_label.pack(anchor="w", padx=10, pady=(5, 2))
             
             for exp, count in sorted(project['lights_by_exposure'].items()):
                 exp_textbox = ctk.CTkTextbox(summary_content, height=25)
                 exp_textbox.pack(fill="x", padx=10, pady=1)
                 exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
+                exp_textbox.configure(state="disabled", font=self.get_font(12))
         
         # Exposure breakdown for darks
         if project.get('darks_by_exposure'):
-            darks_exp_label = ctk.CTkLabel(summary_content, text="Darks by Exposure:", font=ctk.CTkFont(weight="bold"))
+            darks_exp_label = ctk.CTkLabel(summary_content, text="Darks by Exposure:", font=self.get_font(12, weight="bold"))
             darks_exp_label.pack(anchor="w", padx=10, pady=(5, 2))
             
             for exp, count in sorted(project['darks_by_exposure'].items()):
                 exp_textbox = ctk.CTkTextbox(summary_content, height=25)
                 exp_textbox.pack(fill="x", padx=10, pady=1)
                 exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
+                exp_textbox.configure(state="disabled", font=self.get_font(12))
         
         # Integration time
-        time_label = ctk.CTkLabel(summary_content, text="Total Integration Time", font=ctk.CTkFont(weight="bold"))
+        time_label = ctk.CTkLabel(summary_content, text="Total Integration Time", font=self.get_font(12, weight="bold"))
         time_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         total_seconds = project['integration_seconds']
@@ -1028,53 +1037,53 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_value = ctk.CTkTextbox(summary_content, height=30)
         time_value.pack(fill="x", padx=10, pady=(0, 10))
         time_value.insert("1.0", f"{hours}h {minutes}m {seconds}s")
-        time_value.configure(state="disabled", font=ctk.CTkFont(size=14))
+        time_value.configure(state="disabled", font=self.get_font(14))
         
         # File statistics
-        file_label = ctk.CTkLabel(summary_content, text="File Statistics", font=ctk.CTkFont(weight="bold"))
+        file_label = ctk.CTkLabel(summary_content, text="File Statistics", font=self.get_font(12, weight="bold"))
         file_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         file_text = f"{project['total_files']} files | {project['total_size_mb']:.2f} MB"
         file_value = ctk.CTkTextbox(summary_content, height=30)
         file_value.pack(fill="x", padx=10, pady=(0, 10))
         file_value.insert("1.0", file_text)
-        file_value.configure(state="disabled", font=ctk.CTkFont(size=14))
+        file_value.configure(state="disabled", font=self.get_font(14))
         
         # Filters
         if project['filters']:
-            filter_label = ctk.CTkLabel(summary_content, text="Filters", font=ctk.CTkFont(weight="bold"))
+            filter_label = ctk.CTkLabel(summary_content, text="Filters", font=self.get_font(12, weight="bold"))
             filter_label.pack(anchor="w", padx=10, pady=(10, 5))
             
             filter_textbox = ctk.CTkTextbox(summary_content, height=30)
             filter_textbox.pack(fill="x", padx=10, pady=(0, 10))
             filter_textbox.insert("1.0", ', '.join(project['filters']))
-            filter_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+            filter_textbox.configure(state="disabled", font=self.get_font(14))
         
         # Exposures
         if project['exposures']:
-            exp_label = ctk.CTkLabel(summary_content, text="Exposure Times", font=ctk.CTkFont(weight="bold"))
+            exp_label = ctk.CTkLabel(summary_content, text="Exposure Times", font=self.get_font(12, weight="bold"))
             exp_label.pack(anchor="w", padx=10, pady=(10, 5))
             
             exp_text = ', '.join([f"{e}s" for e in project['exposures']])
             exp_textbox = ctk.CTkTextbox(summary_content, height=30)
             exp_textbox.pack(fill="x", padx=10, pady=(0, 10))
             exp_textbox.insert("1.0", exp_text)
-            exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+            exp_textbox.configure(state="disabled", font=self.get_font(14))
         
         # Path
-        path_label = ctk.CTkLabel(summary_content, text="Project Path", font=ctk.CTkFont(weight="bold"))
+        path_label = ctk.CTkLabel(summary_content, text="Project Path", font=self.get_font(12, weight="bold"))
         path_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         path_textbox = ctk.CTkTextbox(summary_content, height=30)
         path_textbox.pack(fill="x", padx=10, pady=(0, 5))
         path_textbox.insert("1.0", project['path'])
-        path_textbox.configure(state="disabled", font=ctk.CTkFont(size=12), text_color="gray")
+        path_textbox.configure(state="disabled", font=self.get_font(12), text_color="gray")
         
         # Open in File Explorer button
         open_button = ctk.CTkButton(
             summary_content,
             text="📂 Open in File Explorer",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             height=32,
             command=lambda: self.open_file_explorer(project['path'])
         )
@@ -1095,7 +1104,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 session_button = ctk.CTkButton(
                     session_frame,
                     text=session_button_text,
-                    font=ctk.CTkFont(size=12),
+                    font=self.get_font(12),
                     height=35
                 )
                 session_button.pack(fill="x", padx=10, pady=(10, 5))
@@ -1106,7 +1115,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 
                 # Session details - Capture Location section (first)
                 if project.get('latitude') and project.get('longitude'):
-                    location_label = ctk.CTkLabel(session_content, text="Capture Location:", font=ctk.CTkFont(weight="bold"))
+                    location_label = ctk.CTkLabel(session_content, text="Capture Location:", font=self.get_font(12, weight="bold"))
                     location_label.pack(anchor="w", padx=10, pady=(5, 2))
                     
                     tag = self.location_tags.get_tag(str(project['latitude']), str(project['longitude']))
@@ -1114,27 +1123,27 @@ class AnalysisWindow(ctk.CTkToplevel):
                         location_textbox = ctk.CTkTextbox(session_content, height=25)
                         location_textbox.pack(fill="x", padx=10, pady=(0, 2))
                         location_textbox.insert("1.0", f"⭐ {tag['name']}")
-                        location_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                        location_textbox.configure(state="disabled", font=self.get_font(14))
                     
                     # Site
                     if project.get('site'):
                         site_textbox = ctk.CTkTextbox(session_content, height=25)
                         site_textbox.pack(fill="x", padx=10, pady=2)
                         site_textbox.insert("1.0", f"Site: {project['site']}")
-                        site_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                        site_textbox.configure(state="disabled", font=self.get_font(14))
                     
                     # Coordinates
                     coord_textbox = ctk.CTkTextbox(session_content, height=25)
                     coord_textbox.pack(fill="x", padx=10, pady=(0, 5))
                     coord_textbox.insert("1.0", f"Lat: {project['latitude']}, Lon: {project['longitude']}")
-                    coord_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    coord_textbox.configure(state="disabled", font=self.get_font(14))
                     
                     # Tag button
                     tag_button_text = "✏️ Edit Tag" if tag else "➕ Add Tag"
                     tag_button = ctk.CTkButton(
                         session_content,
                         text=tag_button_text,
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#FFA500",
                         hover_color="#FF8C00",
@@ -1146,7 +1155,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     maps_button = ctk.CTkButton(
                         session_content,
                         text="🗺️ Open in Google Maps",
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#4285F4",
                         hover_color="#3367D6",
@@ -1155,14 +1164,14 @@ class AnalysisWindow(ctk.CTkToplevel):
                     maps_button.pack(fill="x", padx=10, pady=(0, 10))
                 
                 # Object Information section
-                object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=ctk.CTkFont(weight="bold"))
+                object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=self.get_font(12, weight="bold"))
                 object_info_label.pack(anchor="w", padx=10, pady=(5, 2))
                 
                 # Object name
                 obj_textbox = ctk.CTkTextbox(session_content, height=25)
                 obj_textbox.pack(fill="x", padx=10, pady=2)
                 obj_textbox.insert("1.0", f"Name: {obj}")
-                obj_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                obj_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 # RA/DEC coordinates
                 if ra or dec:
@@ -1172,7 +1181,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     coords_textbox = ctk.CTkTextbox(session_content, height=25)
                     coords_textbox.pack(fill="x", padx=10, pady=2)
                     coords_textbox.insert("1.0", f"RA: {ra_val}, DEC: {dec_val}")
-                    coords_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    coords_textbox.configure(state="disabled", font=self.get_font(14))
                     
                     # Constellation
                     constellation = get_constellation(ra, dec)
@@ -1180,13 +1189,13 @@ class AnalysisWindow(ctk.CTkToplevel):
                         const_textbox = ctk.CTkTextbox(session_content, height=25)
                         const_textbox.pack(fill="x", padx=10, pady=2)
                         const_textbox.insert("1.0", f"Constellation: {constellation}")
-                        const_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                        const_textbox.configure(state="disabled", font=self.get_font(14))
                     
                     # Sky Atlas button - Open Aladin Lite with object coordinates
                     sky_button = ctk.CTkButton(
                         session_content,
                         text="🔭 Open in Sky Atlas (Aladin)",
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#2E86AB",
                         hover_color="#1E5F7A",
@@ -1198,7 +1207,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     preview_button = ctk.CTkButton(
                         session_content,
                         text="🔍 Preview Image",
-                        font=ctk.CTkFont(size=12),
+                        font=self.get_font(12),
                         height=32,
                         fg_color="#4A90A4",
                         hover_color="#3A7A8C",
@@ -1207,27 +1216,27 @@ class AnalysisWindow(ctk.CTkToplevel):
                     preview_button.pack(fill="x", padx=10, pady=(0, 10))
                 
                 # Time section
-                time_label = ctk.CTkLabel(session_content, text="Time:", font=ctk.CTkFont(weight="bold"))
+                time_label = ctk.CTkLabel(session_content, text="Time:", font=self.get_font(12, weight="bold"))
                 time_label.pack(anchor="w", padx=10, pady=(5, 2))
                 
                 start_textbox = ctk.CTkTextbox(session_content, height=25)
                 start_textbox.pack(fill="x", padx=10, pady=2)
                 start_textbox.insert("1.0", f"Start: {self._format_datetime(start)}")
-                start_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                start_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 end_textbox = ctk.CTkTextbox(session_content, height=25)
                 end_textbox.pack(fill="x", padx=10, pady=(0, 5))
                 end_textbox.insert("1.0", f"End: {self._format_datetime(end)}")
-                end_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                end_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 # Captures section
-                captures_label = ctk.CTkLabel(session_content, text="Captures:", font=ctk.CTkFont(weight="bold"))
+                captures_label = ctk.CTkLabel(session_content, text="Captures:", font=self.get_font(12, weight="bold"))
                 captures_label.pack(anchor="w", padx=10, pady=(5, 2))
                 
                 lights_textbox = ctk.CTkTextbox(session_content, height=25)
                 lights_textbox.pack(fill="x", padx=10, pady=2)
                 lights_textbox.insert("1.0", f"Lights: {lights}")
-                lights_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                lights_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 if integration > 0:
                     hours = int(integration // 3600)
@@ -1238,25 +1247,25 @@ class AnalysisWindow(ctk.CTkToplevel):
                     integration_textbox = ctk.CTkTextbox(session_content, height=25)
                     integration_textbox.pack(fill="x", padx=10, pady=(0, 5))
                     integration_textbox.insert("1.0", f"Integration: {integration_text}")
-                    integration_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    integration_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 # Exposure breakdown section
                 if lights_by_exposure:
-                    exp_label = ctk.CTkLabel(session_content, text="Exposure Breakdown:", font=ctk.CTkFont(weight="bold"))
+                    exp_label = ctk.CTkLabel(session_content, text="Exposure Breakdown:", font=self.get_font(12, weight="bold"))
                     exp_label.pack(anchor="w", padx=10, pady=(5, 2))
                     
                     for exp, count in sorted(lights_by_exposure.items()):
                         exp_textbox = ctk.CTkTextbox(session_content, height=25)
                         exp_textbox.pack(fill="x", padx=10, pady=1)
                         exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                        exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=12))
+                        exp_textbox.configure(state="disabled", font=self.get_font(12))
                 
                 if exposures:
                     exp_text = ', '.join([f"{e}s" for e in exposures])
                     exp_textbox = ctk.CTkTextbox(session_content, height=25)
                     exp_textbox.pack(fill="x", padx=10, pady=(2, 10))
                     exp_textbox.insert("1.0", f"Exposures: {exp_text}")
-                    exp_textbox.configure(state="disabled", font=ctk.CTkFont(size=14))
+                    exp_textbox.configure(state="disabled", font=self.get_font(14))
     
     def toggle_expandable_section(self, button, content_frame):
         """Toggle visibility of an expandable section with accordion behavior."""

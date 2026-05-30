@@ -17,18 +17,20 @@ class FolderSelectionWindow(ctk.CTkToplevel):
     select specific folders or use Select All/Deselect All options.
     """
     
-    def __init__(self, parent, folders: List[Path]):
+    def __init__(self, parent, folders: List[Path], settings=None):
         """
         Initialize the folder selection window.
         
         Args:
             parent: Parent window
             folders: List of Path objects representing discovered folders
+            settings: AppSettings instance for text scaling
         """
         super().__init__(parent)
         
         self.parent = parent
         self.folders = folders
+        self.settings = settings
         self.selected_folders: List[Path] = []
         self.result = None
         
@@ -38,6 +40,17 @@ class FolderSelectionWindow(ctk.CTkToplevel):
         self.grab_set()
         
         self.setup_ui()
+    
+    def get_font(self, size: int, weight: str = None):
+        """Get a CTkFont with text scaling applied."""
+        if self.settings:
+            scale = self.settings.get_text_scale()
+            scaled_size = int(size * scale)
+        else:
+            scaled_size = size
+        if weight:
+            return ctk.CTkFont(size=scaled_size, weight=weight)
+        return ctk.CTkFont(size=scaled_size)
     
     def setup_ui(self):
         """Setup the folder selection UI components."""
@@ -49,7 +62,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
         title_label = ctk.CTkLabel(
             main_frame,
             text="📁 Select Folders to Process",
-            font=ctk.CTkFont(size=20, weight="bold")
+            font=self.get_font(20, weight="bold")
         )
         title_label.pack(pady=(0, 10))
         
@@ -57,7 +70,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
         desc_label = ctk.CTkLabel(
             main_frame,
             text=f"Found {len(self.folders)} folder(s). Select which ones to process:",
-            font=ctk.CTkFont(size=12),
+            font=self.get_font(12),
             text_color="gray"
         )
         desc_label.pack(anchor="w", pady=(0, 10))
@@ -96,7 +109,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
                 scroll_frame,
                 text=folder.name,
                 variable=var,
-                font=ctk.CTkFont(size=12)
+                font=self.get_font(12)
             )
             checkbox.pack(anchor="w", pady=2, padx=5)
         
