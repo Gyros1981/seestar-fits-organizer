@@ -1499,9 +1499,27 @@ class SeestarApp(ctk.CTk):
         )
         text_scale_help.pack(anchor="w", padx=10, pady=(0, 10))
         
-        # Save button at bottom
+        # Button frame for Save and Reset
+        button_frame = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
+        button_frame.pack(fill="x", padx=20, pady=(10, 15), side="bottom")
+        button_frame.grid_columnconfigure(0, weight=1)
+        button_frame.grid_columnconfigure(1, weight=1)
+        
+        # Reset to Defaults button
+        reset_button = ctk.CTkButton(
+            button_frame,
+            text="↺ Reset to Defaults",
+            command=self.reset_settings_to_defaults,
+            height=40,
+            fg_color="#7F8C8D",
+            hover_color="#616A6B",
+            font=self.get_font(12)
+        )
+        reset_button.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        
+        # Save button
         save_button = ctk.CTkButton(
-            self.settings_frame,
+            button_frame,
             text="💾 Save Settings",
             command=self.save_main_settings,
             height=40,
@@ -1509,7 +1527,7 @@ class SeestarApp(ctk.CTk):
             hover_color="#D35400",
             font=self.get_font(14, weight="bold")
         )
-        save_button.pack(fill="x", padx=20, pady=(10, 15), side="bottom")
+        save_button.grid(row=0, column=1, padx=(10, 0), sticky="ew")
     
     def save_main_settings(self):
         """Save settings from main view."""
@@ -1553,6 +1571,46 @@ class SeestarApp(ctk.CTk):
             logger.info("Settings saved from main view")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save settings: {str(e)}")
+    
+    def reset_settings_to_defaults(self):
+        """Reset all settings to default values with confirmation."""
+        # Show confirmation dialog
+        result = messagebox.askyesno(
+            "Confirm Reset",
+            "Are you sure you want to reset all settings to defaults?\n\n"
+            "This will:\n"
+            "• Reset location threshold to 0.005°\n"
+            "• Reset timezone to UTC\n"
+            "• Reset coordinate format to Decimal Degrees\n"
+            "• Reset text scale to Normal (1.0x)\n"
+            "• Clear disclaimer acknowledgment\n\n"
+            "Settings will be saved immediately.",
+            icon='warning'
+        )
+        
+        if result:
+            try:
+                # Reset settings in backend
+                self.settings.reset_to_defaults()
+                
+                # Update UI to reflect defaults
+                self.settings_threshold_entry.delete(0, "end")
+                self.settings_threshold_entry.insert(0, "0.005")
+                
+                self.settings_timezone_menu.set("UTC")
+                
+                self.settings_coord_menu.set("Decimal Degrees")
+                
+                self.settings_text_scale_menu.set("Normal (1.0x)")
+                
+                messagebox.showinfo(
+                    "Settings Reset",
+                    "All settings have been reset to defaults.\n\n"
+                    "Note: Text scale changes require restarting the application."
+                )
+                logger.info("Settings reset to defaults via UI")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to reset settings: {str(e)}")
     
     def toggle_disclaimer(self):
         """Toggle the disclaimer acknowledgment based on switch state."""

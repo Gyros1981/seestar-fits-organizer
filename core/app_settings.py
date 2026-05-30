@@ -160,3 +160,15 @@ class AppSettings:
         scale = max(0.8, min(1.4, scale))
         self.settings['text_scale'] = scale
         self._save_settings()
+    
+    def reset_to_defaults(self):
+        """Reset all settings to default values."""
+        self.settings = {
+            'location_threshold': 0.005,  # degrees
+            'timezone': 'UTC',  # UTC, PST, EST, or Local
+            'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
+            'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
+            'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
+        }
+        self._save_settings()
+        logger.info("Settings reset to defaults")
