@@ -1806,7 +1806,7 @@ class SeestarApp(ctk.CTk):
                  "• Planetary & Scenery Import - Copy Solar, Lunar, Planetary, and Scenery media\n"
                  "• Project Analysis - View integration time, frame counts, and session details\n"
                  "• FITS Viewer - Browse and preview FITS files with arrow key navigation\n\n"
-                 "Version: 1.3.2\n"
+                 "Version: 1.3.3\n"
                  "Created by Guy Ronen",
             font=self.get_font(16),
             text_color="gray",
