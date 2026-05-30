@@ -932,8 +932,15 @@ class SeestarApp(ctk.CTk):
         )
         self.zoom_in_btn.pack(pady=(0, 5))
         
-        self.zoom_level_label = ctk.CTkLabel(zoom_frame, text="100%", font=self.get_font(10), width=40)
+        self.zoom_level_label = ctk.CTkLabel(
+            zoom_frame, 
+            text="100%", 
+            font=self.get_font(10, weight="bold"), 
+            width=40,
+            cursor="hand2"
+        )
         self.zoom_level_label.pack(pady=5)
+        self.zoom_level_label.bind("<Button-1>", self._on_zoom_label_click)
         
         self.zoom_out_btn = ctk.CTkButton(
             zoom_frame, 
@@ -1067,8 +1074,8 @@ class SeestarApp(ctk.CTk):
     
     def zoom_fits_in(self):
         """Zoom in on the FITS preview."""
-        if self.fits_zoom_level < 4.0:
-            self.fits_zoom_level = min(4.0, self.fits_zoom_level + 0.25)
+        if self.fits_zoom_level < 2.5:
+            self.fits_zoom_level = min(2.5, self.fits_zoom_level + 0.25)
             self._update_zoom_display()
             # Reload current image with new zoom
             if self.selected_fits_index >= 0 and self.fits_files:
@@ -1089,7 +1096,7 @@ class SeestarApp(ctk.CTk):
         self.zoom_level_label.configure(text=f"{percentage}%")
         
         # Enable/disable buttons at limits
-        if self.fits_zoom_level >= 4.0:
+        if self.fits_zoom_level >= 2.5:
             self.zoom_in_btn.configure(state="disabled")
         else:
             self.zoom_in_btn.configure(state="normal")
@@ -1098,6 +1105,75 @@ class SeestarApp(ctk.CTk):
             self.zoom_out_btn.configure(state="disabled")
         else:
             self.zoom_out_btn.configure(state="normal")
+    
+    def _on_zoom_label_click(self, event):
+        """Handle click on zoom level label to allow manual zoom input."""
+        self._show_zoom_input_dialog()
+    
+    def _show_zoom_input_dialog(self):
+        """Show dialog for manual zoom percentage input."""
+        import tkinter.simpledialog as simpledialog
+        
+        current_percent = int(self.fits_zoom_level * 100)
+        
+        # Create custom dialog
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Set Zoom Level")
+        dialog.geometry("250x150")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Label
+        label = ctk.CTkLabel(dialog, text="Enter zoom percentage:", font=self.get_font(12))
+        label.pack(pady=(20, 10))
+        
+        # Entry field
+        entry = ctk.CTkEntry(dialog, font=self.get_font(12))
+        entry.pack(padx=20, pady=5)
+        entry.insert(0, str(current_percent))
+        entry.select_range(0, "end")
+        entry.focus()
+        
+        # Help text
+        help_label = ctk.CTkLabel(dialog, text="Range: 30% - 250%", font=self.get_font(10), text_color="gray")
+        help_label.pack(pady=(0, 10))
+        
+        def apply_zoom():
+            try:
+                value = int(entry.get())
+                # Clamp to valid range
+                value = max(30, min(250, value))
+                # Convert to scale factor
+                self.fits_zoom_level = value / 100.0
+                self._update_zoom_display()
+                # Reload current image with new zoom
+                if self.selected_fits_index >= 0 and self.fits_files:
+                    self.show_fits_preview(self.fits_files[self.selected_fits_index])
+                dialog.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Please enter a valid number (30-250)")
+        
+        def on_enter(event):
+            apply_zoom()
+        
+        entry.bind("<Return>", on_enter)
+        
+        # Button frame
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(pady=10)
+        
+        cancel_btn = ctk.CTkButton(btn_frame, text="Cancel", width=80, command=dialog.destroy)
+        cancel_btn.pack(side="left", padx=5)
+        
+        ok_btn = ctk.CTkButton(btn_frame, text="OK", width=80, command=apply_zoom)
+        ok_btn.pack(side="left", padx=5)
     
     def _update_nav_buttons(self):
         """Update navigation button states based on current position."""
