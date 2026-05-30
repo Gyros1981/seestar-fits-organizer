@@ -144,6 +144,8 @@ class SeestarApp(ctk.CTk):
             text="❌ Exit",
             font=ctk.CTkFont(size=12),
             width=80,
+            fg_color="#C0392B",
+            hover_color="#A93226",
             command=self.quit
         )
         exit_btn.place(relx=1.0, x=-90, y=5)
@@ -165,6 +167,7 @@ class SeestarApp(ctk.CTk):
         # Create mode frames (hidden initially)
         self._create_scan_build_frame()
         self._create_analyze_frame()
+        self._create_planetary_scenery_frame()
         
         # Default/Welcome frame
         self.welcome_frame = ctk.CTkFrame(self.left_panel)
@@ -180,7 +183,9 @@ class SeestarApp(ctk.CTk):
         welcome_text = ctk.CTkLabel(
             self.welcome_frame,
             text="Select a mode from the menu above to get started:\n\n"
-                 "📥 Import → 🔭 Scan & Build Projects (from Seestar)\n"
+                 "📥 Import → 🔭 Direct (from Seestar)\n"
+                 "📥 Import → 📁 Intermediate (via Raw)\n"
+                 "📥 Import → 🌙 Copy Planetary & Scenery\n"
                  "🔧 Tools → 🪐 Analyze Projects\n"
                  "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
@@ -277,6 +282,22 @@ class SeestarApp(ctk.CTk):
             self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
             logger.info(f"Selected analyze projects directory: {self.analyze_projects_dir}")
     
+    def select_ps_source_dir(self):
+        """Select Seestar MyWorks directory for Planetary & Scenery copy."""
+        directory = filedialog.askdirectory(title="Select Seestar MyWorks Directory")
+        if directory:
+            self.ps_source_dir = Path(directory)
+            self.ps_source_path_label.configure(text=str(self.ps_source_dir), text_color="white")
+            logger.info(f"Selected Planetary & Scenery source: {self.ps_source_dir}")
+    
+    def select_ps_target_dir(self):
+        """Select target directory for Planetary & Scenery copy."""
+        directory = filedialog.askdirectory(title="Select Target Directory for Planetary & Scenery")
+        if directory:
+            self.ps_target_dir = Path(directory)
+            self.ps_target_path_label.configure(text=str(self.ps_target_dir), text_color="white")
+            logger.info(f"Selected Planetary & Scenery target: {self.ps_target_dir}")
+    
     def start_scan(self):
         """Start scanning and building projects in a separate thread."""
         # Validate directories based on workflow mode
@@ -315,6 +336,22 @@ class SeestarApp(ctk.CTk):
         self.progress_label.configure(text="Analyzing projects...")
         
         thread = threading.Thread(target=self.analyze_projects)
+        thread.daemon = True
+        thread.start()
+    
+    def start_planetary_scenery_copy(self):
+        """Start copying Planetary & Scenery media in a separate thread."""
+        if not hasattr(self, 'ps_source_dir') or not self.ps_source_dir:
+            messagebox.showerror("Error", "Please select Seestar MyWorks directory")
+            return
+        if not hasattr(self, 'ps_target_dir') or not self.ps_target_dir:
+            messagebox.showerror("Error", "Please select target directory")
+            return
+        
+        self.set_ui_state(False)
+        self.progress_label.configure(text="Copying Planetary & Scenery media...")
+        
+        thread = threading.Thread(target=self.copy_planetary_scenery)
         thread.daemon = True
         thread.start()
     
@@ -511,6 +548,70 @@ class SeestarApp(ctk.CTk):
         finally:
             self.after(0, lambda: self.set_ui_state(True))
     
+    def copy_planetary_scenery(self):
+        """Copy Planetary & Scenery media from Seestar to target."""
+        try:
+            # Media folders to look for
+            media_folders = [
+                'Planetary_video', 'Planetary_photo',
+                'Solar_video', 'Solar_photo',
+                'Scenery_video', 'Scenery_photo',
+                'Lunar_video', 'Lunar_photo'
+            ]
+            
+            total_files = 0
+            copied_files = 0
+            skipped_files = 0
+            
+            for folder_name in media_folders:
+                source_folder = self.ps_source_dir / folder_name
+                if not source_folder.exists():
+                    continue
+                
+                # Create target folder
+                target_folder = self.ps_target_dir / folder_name
+                target_folder.mkdir(parents=True, exist_ok=True)
+                
+                # Copy all files (images and videos)
+                for item in source_folder.iterdir():
+                    if item.is_file():
+                        total_files += 1
+                        dest_file = target_folder / item.name
+                        
+                        if dest_file.exists():
+                            # Compare sizes
+                            if item.stat().st_size == dest_file.stat().st_size:
+                                skipped_files += 1
+                                continue
+                        
+                        shutil.copy2(item, dest_file)
+                        copied_files += 1
+                
+                self.after(0, lambda f=folder_name, c=copied_files, s=skipped_files: 
+                    self.progress_label.configure(
+                        text=f"Copied {f}: {c} new, {s} skipped"
+                    ))
+            
+            # Show completion
+            self.after(0, lambda: self.progress_label.configure(
+                text=f"✓ Copied {copied_files} files, skipped {skipped_files}"
+            ))
+            
+            self.after(0, lambda: messagebox.showinfo(
+                "Copy Complete",
+                f"Planetary & Scenery copy complete!\n"
+                f"Copied: {copied_files} files\n"
+                f"Skipped (already exist): {skipped_files} files"
+            ))
+            
+        except Exception as e:
+            logger.error(f"Error copying Planetary & Scenery: {e}")
+            self.after(0, lambda: self.progress_label.configure(text=f"Error: {str(e)}"))
+            self.after(0, lambda: messagebox.showerror("Error", f"Failed to copy media: {str(e)}"))
+        
+        finally:
+            self.after(0, lambda: self.set_ui_state(True))
+    
     def show_analysis_window(self, results):
         """Show analysis results in a new window."""
         location_tags = LocationTags()
@@ -523,44 +624,20 @@ class SeestarApp(ctk.CTk):
         # Store references to frame widgets
         self.scan_build_widgets = {}
         
-        scan_build_label = ctk.CTkLabel(self.scan_build_frame, text="Scan & Build Projects", font=ctk.CTkFont(size=16, weight="bold"))
-        scan_build_label.pack(anchor="w", padx=10, pady=(10, 10))
+        # Dynamic title (updated based on workflow mode)
+        self.scan_build_title = ctk.CTkLabel(self.scan_build_frame, text="Direct Copy", font=ctk.CTkFont(size=16, weight="bold"))
+        self.scan_build_title.pack(anchor="w", padx=10, pady=(10, 5))
         
-        # Workflow Selection
-        workflow_label = ctk.CTkLabel(self.scan_build_frame, text="Select Workflow:", font=ctk.CTkFont(weight="bold"))
-        workflow_label.pack(anchor="w", padx=10, pady=(0, 5))
-        
-        workflow_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
-        workflow_button_frame.pack(fill="x", padx=10, pady=(0, 10))
-        
-        self.direct_radio = ctk.CTkRadioButton(
-            workflow_button_frame,
-            text="Direct (Seestar → Projects)",
-            variable=self.workflow_var,
-            value="direct",
-            command=self.toggle_workflow
-        )
-        self.direct_radio.pack(side="left", padx=(0, 20))
-        
-        self.intermediate_radio = ctk.CTkRadioButton(
-            workflow_button_frame,
-            text="Intermediate (Seestar → Raw → Projects)",
-            variable=self.workflow_var,
-            value="intermediate",
-            command=self.toggle_workflow
-        )
-        self.intermediate_radio.pack(side="left")
-        self.direct_radio.select()
-        
-        # Workflow explanation
-        self.workflow_explanation = ctk.CTkLabel(
+        # Dynamic explanation (updated based on workflow mode)
+        self.scan_build_explanation = ctk.CTkLabel(
             self.scan_build_frame,
-            text="Direct: Copy directly from Seestar device to project folders (skips intermediate Raw directory).",
-            font=ctk.CTkFont(size=11),
+            text="Copy FITS files directly from Seestar device to project folders. This mode skips the intermediate Raw directory.",
+            font=ctk.CTkFont(size=13),
             text_color="gray",
-            wraplength=900
+            wraplength=900,
+            justify="left"
         )
-        self.workflow_explanation.pack(anchor="w", padx=10, pady=(0, 10))
+        self.scan_build_explanation.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Seestar Device Directory
         seestar_label = ctk.CTkLabel(self.scan_build_frame, text="Seestar MyWork Directory:", font=ctk.CTkFont(weight="bold"))
@@ -606,12 +683,12 @@ class SeestarApp(ctk.CTk):
         # Start Button
         self.scan_build_action_btn = ctk.CTkButton(
             self.scan_build_frame,
-            text="🔭 Start Scan & Build",
+            text="🔭 Start Import",
             command=self.start_scan,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#1E90FF",
-            hover_color="#4169E1"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.scan_build_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
@@ -642,10 +719,72 @@ class SeestarApp(ctk.CTk):
             command=self.start_analysis,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#2E86AB",
-            hover_color="#1E5F7A"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.analyze_action_btn.pack(fill="x", padx=10, pady=(10, 10))
+    
+    def _create_planetary_scenery_frame(self):
+        """Create Planetary & Scenery copy mode frame (hidden initially)."""
+        self.planetary_scenery_frame = ctk.CTkFrame(self.left_panel)
+        
+        ps_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Copy Planetary & Scenery Media", font=ctk.CTkFont(size=16, weight="bold"))
+        ps_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        explanation = ctk.CTkLabel(
+            self.planetary_scenery_frame,
+            text="Copy Solar, Lunar, Planetary, and Scenery images and videos from Seestar MyWorks to a target directory. "
+                 "This mode handles the non-FITS media files that are not part of the deep sky astrophotography workflow.\n\n"
+                 "The following folders will be copied if they exist:\n"
+                 "• Planetary_video, Planetary_photo\n"
+                 "• Solar_video, Solar_photo\n"
+                 "• Lunar_video, Lunar_photo\n"
+                 "• Scenery_video, Scenery_photo\n\n"
+                 "Files are only copied if they don't already exist at the destination (matching file size).",
+            font=ctk.CTkFont(size=13),
+            text_color="gray",
+            wraplength=900,
+            justify="left"
+        )
+        explanation.pack(anchor="w", padx=10, pady=(0, 10))
+        
+        # Source: Seestar MyWorks Directory
+        source_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Seestar MyWorks Directory:", font=ctk.CTkFont(weight="bold"))
+        source_label.pack(anchor="w", padx=10, pady=(10, 0))
+        
+        source_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
+        source_button_frame.pack(fill="x", padx=10, pady=(5, 10))
+        
+        self.ps_source_path_label = ctk.CTkLabel(source_button_frame, text="Not selected", text_color="gray")
+        self.ps_source_path_label.pack(side="left", padx=(0, 10))
+        
+        self.ps_source_button = ctk.CTkButton(source_button_frame, text="🌌 Browse", command=self.select_ps_source_dir, width=100)
+        self.ps_source_button.pack(side="right")
+        
+        # Target: Destination Directory
+        target_label = ctk.CTkLabel(self.planetary_scenery_frame, text="Target Directory:", font=ctk.CTkFont(weight="bold"))
+        target_label.pack(anchor="w", padx=10, pady=(10, 0))
+        
+        target_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
+        target_button_frame.pack(fill="x", padx=10, pady=(5, 10))
+        
+        self.ps_target_path_label = ctk.CTkLabel(target_button_frame, text="Not selected", text_color="gray")
+        self.ps_target_path_label.pack(side="left", padx=(0, 10))
+        
+        self.ps_target_button = ctk.CTkButton(target_button_frame, text="🌌 Browse", command=self.select_ps_target_dir, width=100)
+        self.ps_target_button.pack(side="right")
+        
+        # Start Button
+        self.ps_action_btn = ctk.CTkButton(
+            self.planetary_scenery_frame,
+            text="🌙 Copy Planetary & Scenery",
+            command=self.start_planetary_scenery_copy,
+            height=40,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        )
+        self.ps_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
     def _create_fits_viewer_frame(self):
         """Create FITS Viewer mode frame (hidden initially)."""
@@ -1093,8 +1232,8 @@ class SeestarApp(ctk.CTk):
             text="💾 Save Settings",
             command=self.save_main_settings,
             height=40,
-            fg_color="#1E90FF",
-            hover_color="#4169E1",
+            fg_color="#E67E22",
+            hover_color="#D35400",
             font=ctk.CTkFont(size=14, weight="bold")
         )
         save_button.pack(fill="x", padx=20, pady=(10, 15), side="bottom")
@@ -1174,13 +1313,39 @@ class SeestarApp(ctk.CTk):
             self.scan_build_frame.pack_forget()
             self.analyze_frame.pack_forget()
             self.about_frame.pack_forget()
+            self.planetary_scenery_frame.pack_forget()
             
             if mode == 'scan_build':
                 self.scan_build_frame.pack(fill="both", expand=True)
-                self.progress_label.configure(text="Scan & Build mode - configure directories and click Start")
+                # Show/hide raw section and update title/explanation based on workflow mode
+                if self.workflow_mode == "direct":
+                    self.scan_build_title.configure(text="Direct Copy")
+                    self.scan_build_explanation.configure(
+                        text="Copy FITS files directly from Seestar device to project folders. "
+                             "This mode skips the intermediate Raw directory and is fastest for typical use.\n\n"
+                             "For each source folder ending in '_sub' or '_subs', a '_Project' folder will be created "
+                             "with lights/, darks/, biases/, and flats/ subdirectories. All FITS files will be "
+                             "classified and copied to the appropriate folder (typically lights/)."
+                    )
+                    self.raw_section_frame.pack_forget()
+                    self.progress_label.configure(text="Direct mode: Seestar → Projects")
+                else:
+                    self.scan_build_title.configure(text="Intermediate Copy")
+                    self.scan_build_explanation.configure(
+                        text="Copy FITS files from Seestar to Raw directory first, then build projects. "
+                             "This mode preserves the original files and allows for more flexible project management.\n\n"
+                             "For each source folder ending in '_sub' or '_subs', a '_Project' folder will be created "
+                             "with lights/, darks/, biases/, and flats/ subdirectories. All FITS files will be "
+                             "classified and copied to the appropriate folder (typically lights/)."
+                    )
+                    self.raw_section_frame.pack(fill="x", padx=10, pady=(0, 0), before=self.projects_label)
+                    self.progress_label.configure(text="Intermediate mode: Seestar → Raw → Projects")
             elif mode == 'analyze':
                 self.analyze_frame.pack(fill="both", expand=True)
                 self.progress_label.configure(text="Analysis mode - select projects directory and click Start")
+            elif mode == 'planetary_scenery':
+                self.planetary_scenery_frame.pack(fill="both", expand=True)
+                self.progress_label.configure(text="Copy Planetary & Scenery - select directories and click Start")
             elif mode == 'about':
                 self.about_frame.pack(fill="both", expand=True)
                 self.progress_label.configure(text="About - Seestar FITS Organizer")
@@ -1227,7 +1392,7 @@ class SeestarApp(ctk.CTk):
         self._import_menu = ctk.CTkToplevel(self)
         menu = self._import_menu
         # Position below Import button (y + 40 to be below the button)
-        menu.geometry(f"200x90+{self.winfo_x() + 20}+{self.winfo_y() + 45}")
+        menu.geometry(f"200x130+{self.winfo_x() + 20}+{self.winfo_y() + 45}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
@@ -1237,18 +1402,29 @@ class SeestarApp(ctk.CTk):
                 self._import_menu.destroy()
             self._import_menu = None
         
-        def scan_and_close():
+        def direct_flow():
             close_menu()
+            self.workflow_mode = "direct"
             self.lift()
             self.after(100, lambda: self.show_mode('scan_build'))
         
-        def analyze_and_close():
+        def intermediate_flow():
+            close_menu()
+            self.workflow_mode = "intermediate"
+            self.lift()
+            self.after(100, lambda: self.show_mode('scan_build'))
+        
+        def planetary_scenery_flow():
             close_menu()
             self.lift()
-            self.after(100, lambda: self.show_mode('analyze'))
+            self.after(100, lambda: self.show_mode('planetary_scenery'))
         
-        ctk.CTkButton(menu, text="🔭 Scan & Build Projects", 
-                     command=scan_and_close).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(menu, text="� Direct", 
+                     command=direct_flow).pack(fill="x", padx=10, pady=2)
+        ctk.CTkButton(menu, text="📁 Intermediate", 
+                     command=intermediate_flow).pack(fill="x", padx=10, pady=2)
+        ctk.CTkButton(menu, text="🌙 Copy Planetary & Scenery", 
+                     command=planetary_scenery_flow).pack(fill="x", padx=10, pady=2)
         
         # Close on Escape
         menu.bind("<Escape>", lambda e: close_menu())
@@ -1337,11 +1513,18 @@ class SeestarApp(ctk.CTk):
         about_text = ctk.CTkLabel(
             self.about_frame,
             text="Seestar FITS Organizer\n\n"
-                 "A tool for organizing astrophotography data\n"
-                 "from Seestar telescopes.\n\n"
-                 "Version: 1.2",
-            font=ctk.CTkFont(size=12),
+                 "A tool for organizing astrophotography data from Seestar telescopes.\n\n"
+                 "Features:\n"
+                 "• Direct Import - Copy FITS files directly from Seestar to organized projects\n"
+                 "• Intermediate Import - Copy to Raw folder first, then build projects\n"
+                 "• Planetary & Scenery Import - Copy Solar, Lunar, Planetary, and Scenery media\n"
+                 "• Project Analysis - View integration time, frame counts, and session details\n"
+                 "• FITS Viewer - Browse and preview FITS files with arrow key navigation\n\n"
+                 "Version: 1.3.2\n"
+                 "Created by Guy Ronen",
+            font=ctk.CTkFont(size=13),
             text_color="gray",
+            wraplength=900,
             justify="left"
         )
         about_text.pack(anchor="w", padx=10, pady=10)
