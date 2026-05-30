@@ -1,6 +1,6 @@
 {
   "location_threshold": 0.005,
-  "timezone": "UTC",
+  "timezone": "PST",
   "disclaimer_acknowledged": true,
-  "coordinate_format": "degrees"
+  "coordinate_format": "hms"
 }

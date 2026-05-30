@@ -50,6 +50,11 @@ class SeestarApp(ctk.CTk):
         
         # Initialize settings
         self.settings = AppSettings()
+        logger.info(f"Settings loaded from: {self.settings.storage_path}")
+        logger.info(f"Settings: threshold={self.settings.get_location_threshold()}, "
+                   f"timezone={self.settings.get_timezone()}, "
+                   f"coord_format={self.settings.get_coordinate_format()}, "
+                   f"disclaimer_ack={self.settings.get_disclaimer_acknowledged()}")
         
         # Show disclaimer if not acknowledged
         if not self.settings.get_disclaimer_acknowledged():
@@ -1159,6 +1164,7 @@ class SeestarApp(ctk.CTk):
         
         # Map timezone setting to menu value
         tz_setting = self.settings.get_timezone()
+        logger.info(f"Loading timezone setting: {tz_setting}")
         if tz_setting == "UTC":
             self.settings_timezone_menu.set("UTC")
         elif tz_setting == "EST":
@@ -1167,6 +1173,7 @@ class SeestarApp(ctk.CTk):
             self.settings_timezone_menu.set("Local")
         else:
             self.settings_timezone_menu.set("PST (UTC-8)")
+        logger.info(f"Timezone menu set to: {self.settings_timezone_menu.get()}")
         
         # Coordinate Format Section
         coord_frame = ctk.CTkFrame(scroll_frame)
@@ -1247,14 +1254,16 @@ class SeestarApp(ctk.CTk):
             
             # Save timezone
             tz_value = self.settings_timezone_menu.get()
-            if "UTC" in tz_value:
+            logger.info(f"Saving timezone from menu value: {tz_value}")
+            if tz_value.startswith("UTC"):
                 self.settings.set_timezone("UTC")
-            elif "EST" in tz_value:
+            elif tz_value.startswith("EST"):
                 self.settings.set_timezone("EST")
-            elif "Local" in tz_value:
+            elif tz_value.startswith("Local"):
                 self.settings.set_timezone("Local")
             else:
                 self.settings.set_timezone("PST")
+            logger.info(f"Timezone saved as: {self.settings.get_timezone()}")
             
             # Save coordinate format
             coord_value = self.settings_coord_menu.get()

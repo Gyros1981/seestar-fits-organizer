@@ -41,7 +41,7 @@ class AppSettings:
         # Default settings
         self.settings: Dict = {
             'location_threshold': 0.005,  # degrees
-            'timezone': 'PST',  # UTC, PST, EST, or Local
+            'timezone': 'UTC',  # UTC, PST, EST, or Local
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
         }
@@ -59,10 +59,7 @@ class AppSettings:
                 logger.info(f"Loaded settings from {self.storage_path}")
         except Exception as e:
             logger.error(f"Failed to load settings: {e}")
-            self.settings = {
-                'location_threshold': 0.005,
-                'timezone': 'PST',
-            }
+            # Keep defaults (already set in __init__)
     
     def _save_settings(self):
         """Save settings to storage file."""
