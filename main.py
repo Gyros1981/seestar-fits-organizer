@@ -98,15 +98,15 @@ class SeestarApp(ctk.CTk):
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
         # Menu buttons packed directly into main_frame (no menu_frame wrapper)
-        # File Menu
-        file_menu_btn = ctk.CTkButton(
+        # Import Menu (for transferring files from Seestar)
+        import_menu_btn = ctk.CTkButton(
             main_frame,
-            text="📁 File",
+            text="� Import",
             font=ctk.CTkFont(size=12),
             width=80,
-            command=self.show_file_menu
+            command=self.show_import_menu
         )
-        file_menu_btn.pack(side="top", anchor="w", padx=10, pady=(5, 0))
+        import_menu_btn.pack(side="top", anchor="w", padx=10, pady=(5, 0))
         
         # Tools Menu
         tools_menu_btn = ctk.CTkButton(
@@ -180,8 +180,8 @@ class SeestarApp(ctk.CTk):
         welcome_text = ctk.CTkLabel(
             self.welcome_frame,
             text="Select a mode from the menu above to get started:\n\n"
-                 "📁 File → 🔭 Scan & Build Projects\n"
-                 "📁 File → 🪐 Analyze Projects\n"
+                 "📥 Import → 🔭 Scan & Build Projects (from Seestar)\n"
+                 "🔧 Tools → 🪐 Analyze Projects\n"
                  "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
             font=ctk.CTkFont(size=12),
@@ -212,6 +212,9 @@ class SeestarApp(ctk.CTk):
         
         # FITS Viewer frame
         self._create_fits_viewer_frame()
+        
+        # About frame
+        self._create_about_frame()
         
         # Redirect logging to console
         self.setup_console_logging()
@@ -1170,6 +1173,7 @@ class SeestarApp(ctk.CTk):
             self.welcome_frame.pack_forget()
             self.scan_build_frame.pack_forget()
             self.analyze_frame.pack_forget()
+            self.about_frame.pack_forget()
             
             if mode == 'scan_build':
                 self.scan_build_frame.pack(fill="both", expand=True)
@@ -1177,13 +1181,16 @@ class SeestarApp(ctk.CTk):
             elif mode == 'analyze':
                 self.analyze_frame.pack(fill="both", expand=True)
                 self.progress_label.configure(text="Analysis mode - select projects directory and click Start")
+            elif mode == 'about':
+                self.about_frame.pack(fill="both", expand=True)
+                self.progress_label.configure(text="About - Seestar FITS Organizer")
             else:
                 self.welcome_frame.pack(fill="both", expand=True)
                 self.progress_label.configure(text="Ready")
     
     def destroy_all_menus(self):
         """Destroy all open menus."""
-        for attr in ['_file_menu', '_tools_menu', '_help_menu']:
+        for attr in ['_import_menu', '_tools_menu', '_help_menu']:
             if hasattr(self, attr):
                 menu = getattr(self, attr)
                 if menu and menu.winfo_exists():
@@ -1199,36 +1206,36 @@ class SeestarApp(ctk.CTk):
         if widget_class == 'Button' or 'button' in str(widget).lower():
             return
         
-        for attr in ['_file_menu', '_tools_menu', '_help_menu']:
+        for attr in ['_import_menu', '_tools_menu', '_help_menu']:
             if hasattr(self, attr):
                 menu = getattr(self, attr)
                 if menu and menu.winfo_exists():
                     menu.destroy()
                     setattr(self, attr, None)
     
-    def show_file_menu(self):
-        """Show File menu dropdown."""
+    def show_import_menu(self):
+        """Show Import menu dropdown."""
         # Destroy existing menu if open
-        if hasattr(self, '_file_menu') and self._file_menu and self._file_menu.winfo_exists():
-            self._file_menu.destroy()
-            self._file_menu = None
+        if hasattr(self, '_import_menu') and self._import_menu and self._import_menu.winfo_exists():
+            self._import_menu.destroy()
+            self._import_menu = None
             return
         
         # Close any other open menus
         self.destroy_all_menus()
         
-        self._file_menu = ctk.CTkToplevel(self)
-        menu = self._file_menu
-        # Position below File button (y + 40 to be below the button)
+        self._import_menu = ctk.CTkToplevel(self)
+        menu = self._import_menu
+        # Position below Import button (y + 40 to be below the button)
         menu.geometry(f"200x90+{self.winfo_x() + 20}+{self.winfo_y() + 45}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
         
         def close_menu():
-            if hasattr(self, '_file_menu') and self._file_menu and self._file_menu.winfo_exists():
-                self._file_menu.destroy()
-            self._file_menu = None
+            if hasattr(self, '_import_menu') and self._import_menu and self._import_menu.winfo_exists():
+                self._import_menu.destroy()
+            self._import_menu = None
         
         def scan_and_close():
             close_menu()
@@ -1242,8 +1249,6 @@ class SeestarApp(ctk.CTk):
         
         ctk.CTkButton(menu, text="🔭 Scan & Build Projects", 
                      command=scan_and_close).pack(fill="x", padx=10, pady=5)
-        ctk.CTkButton(menu, text="🪐 Analyze Projects", 
-                     command=analyze_and_close).pack(fill="x", padx=10, pady=5)
         
         # Close on Escape
         menu.bind("<Escape>", lambda e: close_menu())
@@ -1261,7 +1266,7 @@ class SeestarApp(ctk.CTk):
         self._tools_menu = ctk.CTkToplevel(self)
         menu = self._tools_menu
         # Position below Tools button (y + 40 to be below the button)
-        menu.geometry(f"200x50+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
+        menu.geometry(f"200x90+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
@@ -1276,7 +1281,14 @@ class SeestarApp(ctk.CTk):
             self.lift()
             self.after(100, lambda: self.show_mode('fits_viewer'))
         
-        ctk.CTkButton(menu, text="🖼️ FITS Viewer", 
+        def analyze_and_close():
+            close_menu()
+            self.lift()
+            self.after(100, lambda: self.show_mode('analyze'))
+        
+        ctk.CTkButton(menu, text="🪐 Analyze Projects",
+                     command=analyze_and_close).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(menu, text="🖼️ FITS Viewer",
                      command=fits_viewer_and_close).pack(fill="x", padx=10, pady=5)
         
         menu.bind("<Escape>", lambda e: close_menu())
@@ -1307,7 +1319,7 @@ class SeestarApp(ctk.CTk):
         def about_and_close():
             close_menu()
             self.lift()
-            self.after(100, self.show_about)
+            self.after(100, lambda: self.show_mode('about'))
         
         ctk.CTkButton(menu, text="ℹ️ About", 
                      command=about_and_close).pack(fill="x", padx=10, pady=5)
@@ -1315,15 +1327,28 @@ class SeestarApp(ctk.CTk):
         menu.bind("<Escape>", lambda e: close_menu())
         menu.focus_set()
     
-    def show_about(self):
-        """Show about dialog."""
-        messagebox.showinfo(
-            "About",
-            "Seestar FITS Organizer\n\n"
-            "A tool for organizing astrophotography data\n"
-            "from Seestar telescopes.\n\n"
-            "Version: 1.2"
+    def _create_about_frame(self):
+        """Create About frame (hidden initially)."""
+        self.about_frame = ctk.CTkFrame(self.left_panel)
+        
+        about_title = ctk.CTkLabel(self.about_frame, text="ℹ️ About", font=ctk.CTkFont(size=16, weight="bold"))
+        about_title.pack(anchor="w", padx=10, pady=(20, 10))
+        
+        about_text = ctk.CTkLabel(
+            self.about_frame,
+            text="Seestar FITS Organizer\n\n"
+                 "A tool for organizing astrophotography data\n"
+                 "from Seestar telescopes.\n\n"
+                 "Version: 1.2",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            justify="left"
         )
+        about_text.pack(anchor="w", padx=10, pady=10)
+    
+    def show_about(self):
+        """Show about view (legacy method, now uses show_mode)."""
+        self.show_mode('about')
     
     def toggle_workflow(self):
         """Toggle between direct and intermediate workflow."""
