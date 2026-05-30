@@ -181,7 +181,7 @@ class SeestarApp(ctk.CTk):
         welcome_title = ctk.CTkLabel(
             self.welcome_frame,
             text="Welcome to Seestar FITS Organizer",
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ctk.CTkFont(size=24, weight="bold")
         )
         welcome_title.pack(pady=(50, 20))
         
@@ -194,7 +194,7 @@ class SeestarApp(ctk.CTk):
                  "🔧 Tools → 🪐 Analyze Projects\n"
                  "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=16),
             text_color="gray"
         )
         welcome_text.pack(pady=20)
@@ -1516,7 +1516,7 @@ class SeestarApp(ctk.CTk):
         """Create About frame (hidden initially)."""
         self.about_frame = ctk.CTkFrame(self.left_panel)
         
-        about_title = ctk.CTkLabel(self.about_frame, text="ℹ️ About", font=ctk.CTkFont(size=16, weight="bold"))
+        about_title = ctk.CTkLabel(self.about_frame, text="ℹ️ About", font=ctk.CTkFont(size=22, weight="bold"))
         about_title.pack(anchor="w", padx=10, pady=(20, 10))
         
         about_text = ctk.CTkLabel(
@@ -1531,7 +1531,7 @@ class SeestarApp(ctk.CTk):
                  "• FITS Viewer - Browse and preview FITS files with arrow key navigation\n\n"
                  "Version: 1.3.2\n"
                  "Created by Guy Ronen",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=16),
             text_color="gray",
             wraplength=900,
             justify="left"
