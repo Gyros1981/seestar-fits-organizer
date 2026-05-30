@@ -676,8 +676,44 @@ class SeestarApp(ctk.CTk):
         list_label = ctk.CTkLabel(left_panel, text="FITS Files", font=ctk.CTkFont(size=12, weight="bold"))
         list_label.pack(anchor="w", padx=10, pady=(5, 0))
         
-        self.fits_file_listbox = ctk.CTkScrollableFrame(left_panel)
-        self.fits_file_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        # Action buttons frame
+        action_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        action_frame.pack(fill="x", padx=5, pady=5)
+        
+        self.mark_btn = ctk.CTkButton(action_frame, text="✓ Mark", command=self.toggle_mark_selected, width=80, font=ctk.CTkFont(size=11))
+        self.mark_btn.pack(side="left", padx=2)
+        
+        self.clear_marks_btn = ctk.CTkButton(action_frame, text="⬜ Clear Marks", command=self.clear_all_marks, width=100, font=ctk.CTkFont(size=11))
+        self.clear_marks_btn.pack(side="left", padx=2)
+        
+        self.delete_marked_btn = ctk.CTkButton(action_frame, text="🗑️ Delete Marked", command=self.delete_marked_fits, width=110, font=ctk.CTkFont(size=11), fg_color="#C0392B", hover_color="#A93226")
+        self.delete_marked_btn.pack(side="right", padx=2)
+        
+        # File list using tk.Listbox for performance
+        import tkinter as tk
+        list_frame = ctk.CTkFrame(left_panel)
+        list_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        self.fits_file_listbox = tk.Listbox(
+            list_frame,
+            selectmode="single",
+            font=("Segoe UI", 11),
+            bg="#2B2B2B",
+            fg="white",
+            selectbackground="#1E90FF",
+            selectforeground="white",
+            borderwidth=0,
+            highlightthickness=0,
+            activestyle="none"  # No underline on active item
+        )
+        self.fits_file_listbox.pack(side="left", fill="both", expand=True)
+        
+        scrollbar = ctk.CTkScrollbar(list_frame, command=self.fits_file_listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.fits_file_listbox.configure(yscrollcommand=scrollbar.set)
+        
+        # Bind selection event
+        self.fits_file_listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
         
         # Right panel - preview
         right_panel = ctk.CTkFrame(content_frame)
@@ -686,8 +722,12 @@ class SeestarApp(ctk.CTk):
         preview_label = ctk.CTkLabel(right_panel, text="Preview", font=ctk.CTkFont(size=12, weight="bold"))
         preview_label.pack(anchor="w", padx=10, pady=(5, 0))
         
+        # Filename label (updates when file selected)
+        self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=ctk.CTkFont(size=11), text_color="gray")
+        self.fits_preview_filename.pack(anchor="w", padx=10, pady=(0, 5))
+        
         self.fits_preview_label = ctk.CTkLabel(right_panel, text="Select a FITS file to preview", text_color="gray")
-        self.fits_preview_label.pack(expand=True)
+        self.fits_preview_label.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Status bar
         self.fits_status_label = ctk.CTkLabel(self.fits_viewer_frame, text="Ready", text_color="gray")
@@ -701,7 +741,7 @@ class SeestarApp(ctk.CTk):
         self.current_fits_directory = None
         self.fits_files = []
         self.selected_fits_index = -1
-        self.fits_file_buttons = []
+        self.marked_for_deletion = set()  # Set of indices marked for deletion
     
     def browse_fits_directory(self):
         """Browse for a directory containing FITS files."""
@@ -711,6 +751,11 @@ class SeestarApp(ctk.CTk):
     
     def load_fits_directory(self, directory):
         """Load FITS files from a directory."""
+        # Clear UI state first
+        self.selected_fits_index = -1
+        self.marked_for_deletion = set()
+        self.fits_preview_label.configure(text="Select a FITS file to preview", image=None)
+        
         self.current_fits_directory = directory
         self.fits_viewer_dir_label.configure(text=directory)
         
@@ -718,43 +763,38 @@ class SeestarApp(ctk.CTk):
         path = Path(directory)
         self.fits_files = sorted([f for f in path.iterdir() if f.is_file() and f.suffix.lower() in ['.fits', '.fit']])
         
-        self.selected_fits_index = -1
         self.refresh_fits_file_list()
         
-        self.fits_status_label.configure(text=f"{len(self.fits_files)} FITS files found")
+        # Auto-select and preview first file if any exist
+        if self.fits_files:
+            self.selected_fits_index = 0
+            self.fits_file_listbox.selection_set(0)
+            self.show_fits_preview(self.fits_files[0])
+            self.fits_status_label.configure(text=f"{len(self.fits_files)} FITS files found - Showing {self.fits_files[0].name}")
+        else:
+            self.fits_status_label.configure(text="No FITS files found")
     
     def refresh_fits_file_list(self):
-        """Refresh the file list display."""
-        # Clear existing buttons
-        for btn in self.fits_file_buttons:
-            btn.destroy()
-        self.fits_file_buttons = []
+        """Refresh the file list display with marked status."""
+        # Clear listbox
+        self.fits_file_listbox.delete(0, "end")
         
-        # Create buttons for each file
+        # Add files with mark indicator
         for i, file_path in enumerate(self.fits_files):
-            btn = ctk.CTkButton(
-                self.fits_file_listbox,
-                text=file_path.name,
-                anchor="w",
-                command=lambda idx=i: self.select_fits_file(idx)
-            )
-            btn.pack(fill="x", padx=5, pady=2)
-            self.fits_file_buttons.append(btn)
+            if i in self.marked_for_deletion:
+                display_text = f"[✓] {file_path.name}"
+            else:
+                display_text = f"[ ] {file_path.name}"
+            self.fits_file_listbox.insert("end", display_text)
     
-    def select_fits_file(self, index):
-        """Select a FITS file and show preview."""
-        if 0 <= index < len(self.fits_files):
+    
+    def on_listbox_select(self, event):
+        """Handle listbox selection change from mouse click."""
+        selection = self.fits_file_listbox.curselection()
+        if selection:
+            index = selection[0]
             self.selected_fits_index = index
             file_path = self.fits_files[index]
-            
-            # Update visual selection
-            for i, btn in enumerate(self.fits_file_buttons):
-                if i == index:
-                    btn.configure(fg_color="#1E90FF")
-                else:
-                    btn.configure(fg_color=["#3B8ED0", "#1F6AA5"])
-            
-            # Show preview
             self.show_fits_preview(file_path)
             self.fits_status_label.configure(text=f"Selected: {file_path.name}")
     
@@ -763,15 +803,105 @@ class SeestarApp(ctk.CTk):
         if not self.fits_files:
             return
         
-        new_index = self.selected_fits_index + direction
+        # Calculate new index from current selection
+        current = self.selected_fits_index
+        if current < 0:
+            current = 0
+            
+        new_index = current + direction
         new_index = max(0, min(new_index, len(self.fits_files) - 1))
         
         if new_index != self.selected_fits_index:
-            self.select_fits_file(new_index)
+            self.selected_fits_index = new_index
+            self.fits_file_listbox.selection_clear(0, "end")
+            self.fits_file_listbox.selection_set(new_index)
+            self.fits_file_listbox.see(new_index)
+            file_path = self.fits_files[new_index]
+            self.show_fits_preview(file_path)
+            self.fits_status_label.configure(text=f"Selected: {file_path.name}")
+    
+    def toggle_mark_selected(self):
+        """Toggle mark for deletion on currently selected file."""
+        selection = self.fits_file_listbox.curselection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select a file first to mark/unmark it.")
+            return
+        
+        index = selection[0]
+        if index in self.marked_for_deletion:
+            self.marked_for_deletion.remove(index)
+            self.fits_status_label.configure(text=f"Unmarked: {self.fits_files[index].name}")
+        else:
+            self.marked_for_deletion.add(index)
+            self.fits_status_label.configure(text=f"Marked for deletion: {self.fits_files[index].name}")
+        
+        self.refresh_fits_file_list()
+    
+    def clear_all_marks(self):
+        """Clear all deletion marks."""
+        self.marked_for_deletion.clear()
+        self.refresh_fits_file_list()
+        self.fits_status_label.configure(text="All marks cleared")
+    
+    def delete_marked_fits(self):
+        """Delete all marked FITS files."""
+        if not self.marked_for_deletion:
+            messagebox.showwarning("No Files Marked", "No files marked for deletion. Use 'Mark' button to mark files.")
+            return
+        
+        marked_indices = sorted(self.marked_for_deletion)
+        count = len(marked_indices)
+        
+        # Show list of files to be deleted
+        if count <= 5:
+            file_list = "\n".join([f"  - {self.fits_files[i].name}" for i in marked_indices])
+        else:
+            file_list = "\n".join([f"  - {self.fits_files[i].name}" for i in marked_indices[:5]])
+            file_list += f"\n  ... and {count - 5} more files"
+        
+        msg = f"Delete {count} marked file(s)?\n\n{file_list}"
+        
+        if not messagebox.askyesno("Confirm Delete", msg + "\n\nThis action cannot be undone!"):
+            return
+        
+        # Delete files
+        deleted = 0
+        failed = 0
+        # Delete in reverse order to maintain index validity
+        for i in reversed(marked_indices):
+            try:
+                file_path = self.fits_files[i]
+                file_path.unlink()
+                deleted += 1
+            except Exception as e:
+                logger.error(f"Failed to delete {self.fits_files[i]}: {e}")
+                failed += 1
+        
+        # Reload directory
+        self.load_fits_directory(self.current_fits_directory)
+        
+        # Show result
+        if failed == 0:
+            self.fits_status_label.configure(text=f"✓ Deleted {deleted} file(s)")
+        else:
+            self.fits_status_label.configure(text=f"Deleted {deleted}, failed {failed}")
     
     def show_fits_preview(self, file_path):
         """Show preview of a FITS file."""
+        # Clear any existing image from label first, then clear our reference
+        if hasattr(self, 'fits_preview_label') and self.fits_preview_label.winfo_exists():
+            try:
+                # Access internal _label to safely clear image
+                self.fits_preview_label._label.configure(image='')
+            except:
+                pass
+        self._current_fits_image = None
+        
         try:
+            # Update filename label
+            if hasattr(self, 'fits_preview_filename') and self.fits_preview_filename.winfo_exists():
+                self.fits_preview_filename.configure(text=file_path.name)
+            
             from astropy.io import fits
             from PIL import Image
             import numpy as np
@@ -781,7 +911,8 @@ class SeestarApp(ctk.CTk):
                 data = hdul[0].data
                 
                 if data is None:
-                    self.fits_preview_label.configure(text="No image data", image=None)
+                    if hasattr(self, 'fits_preview_label') and self.fits_preview_label.winfo_exists():
+                        self.fits_preview_label.configure(text="No image data")
                     return
                 
                 # Normalize for display
@@ -794,20 +925,26 @@ class SeestarApp(ctk.CTk):
                     norm_data = self._normalize_for_display(data[0])
                     img = Image.fromarray((norm_data * 255).astype(np.uint8))
                 else:
-                    self.fits_preview_label.configure(text="Unsupported image format", image=None)
+                    if hasattr(self, 'fits_preview_label') and self.fits_preview_label.winfo_exists():
+                        self.fits_preview_label.configure(text="Unsupported image format")
                     return
                 
-                # Resize to fit preview area (max 600x500)
-                img.thumbnail((600, 500), Image.Resampling.LANCZOS)
+                # Resize to fit preview area (max 800x650)
+                img.thumbnail((800, 650), Image.Resampling.LANCZOS)
                 
                 # Convert to CTkImage
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
                 
-                self.fits_preview_label.configure(text="", image=ctk_img)
+                # Keep reference to prevent garbage collection
+                self._current_fits_image = ctk_img
+                
+                if hasattr(self, 'fits_preview_label') and self.fits_preview_label.winfo_exists():
+                    self.fits_preview_label.configure(text="", image=ctk_img)
                 
         except Exception as e:
             logger.error(f"Error loading FITS preview: {e}")
-            self.fits_preview_label.configure(text=f"Error loading preview:\n{str(e)[:100]}", image=None)
+            if hasattr(self, 'fits_preview_label') and self.fits_preview_label.winfo_exists():
+                self.fits_preview_label.configure(text=f"Error loading preview:\n{str(e)[:100]}")
     
     def _normalize_for_display(self, data):
         """Normalize image data for display."""
