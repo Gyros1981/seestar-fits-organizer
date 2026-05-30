@@ -117,61 +117,67 @@ class SeestarApp(ctk.CTk):
         # Main container - no padding, tight layout
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(1, weight=1)  # Content frame expands
         
-        # Menu buttons packed directly into main_frame (no menu_frame wrapper)
+        # Menu bar frame at top (fixed height)
+        menu_bar = ctk.CTkFrame(main_frame, height=45, fg_color="transparent")
+        menu_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        menu_bar.grid_propagate(False)  # Keep fixed height
+        
         # Home Button (leftmost)
         home_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="🏠",
             font=self.get_font(14),
             width=40,
             command=lambda: self.show_mode('welcome')
         )
-        home_btn.place(x=5, y=5)
+        home_btn.grid(row=0, column=0, padx=2, pady=5)
         
         # Import Menu (for transferring files from Seestar)
         import_menu_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="📥 Import",
             font=self.get_font(12),
             width=80,
             command=self.show_import_menu
         )
-        import_menu_btn.place(x=50, y=5)
+        import_menu_btn.grid(row=0, column=1, padx=2, pady=5)
         
         # Tools Menu
         tools_menu_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="🔧 Tools",
             font=self.get_font(12),
             width=80,
             command=self.show_tools_menu
         )
-        tools_menu_btn.place(x=135, y=5)
+        tools_menu_btn.grid(row=0, column=2, padx=2, pady=5)
         
         # Settings Button (direct)
         settings_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="⚙️ Settings",
             font=self.get_font(12),
             width=100,
             command=lambda: self.show_mode('settings')
         )
-        settings_btn.place(x=220, y=5)
+        settings_btn.grid(row=0, column=3, padx=2, pady=5)
         
         # Help Menu
         help_menu_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="❓ Help",
             font=self.get_font(12),
             width=80,
             command=self.show_help_menu
         )
-        help_menu_btn.place(x=300, y=5)
+        help_menu_btn.grid(row=0, column=4, padx=2, pady=5)
         
         # Exit Button (right-aligned)
         exit_btn = ctk.CTkButton(
-            main_frame,
+            menu_bar,
             text="❌ Exit",
             font=self.get_font(12),
             width=80,
@@ -179,14 +185,15 @@ class SeestarApp(ctk.CTk):
             hover_color="#A93226",
             command=self.quit
         )
-        exit_btn.place(relx=1.0, x=-90, y=5)
+        exit_btn.grid(row=0, column=5, padx=(20, 2), pady=5, sticky="e")
+        menu_bar.grid_columnconfigure(5, weight=1)  # Push exit button to right
         
         # Initialize mode tracking
         self.current_mode = None  # None, 'scan_build', 'analyze', 'settings', or 'fits_viewer'
         
         # Content frame - main container for all views
         self.content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        self.content_frame.pack(fill="both", expand=True, pady=0)
+        self.content_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
         self.content_frame.grid_columnconfigure(0, weight=2)
         self.content_frame.grid_columnconfigure(1, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=1)
@@ -888,19 +895,77 @@ class SeestarApp(ctk.CTk):
         # Bind selection event
         self.fits_file_listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
         
-        # Right panel - preview
+        # Right panel - preview with zoom controls
         right_panel = ctk.CTkFrame(content_frame)
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        right_panel.grid_columnconfigure(0, weight=1)
+        right_panel.grid_columnconfigure(1, weight=0)
+        right_panel.grid_rowconfigure(1, weight=1)
         
         preview_label = ctk.CTkLabel(right_panel, text="Preview", font=self.get_font(12, weight="bold"))
-        preview_label.pack(anchor="w", padx=10, pady=(5, 0))
+        preview_label.grid(row=0, column=0, sticky="w", padx=10, pady=(5, 0))
         
         # Filename label (updates when file selected)
         self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=self.get_font(11), text_color="gray")
-        self.fits_preview_filename.pack(anchor="w", padx=10, pady=(0, 5))
+        self.fits_preview_filename.grid(row=0, column=0, sticky="w", padx=10, pady=(25, 5))
         
-        self.fits_preview_label = ctk.CTkLabel(right_panel, text="Select a FITS file to preview", text_color="gray")
-        self.fits_preview_label.pack(fill="both", expand=True, padx=10, pady=10)
+        # Preview image container
+        preview_container = ctk.CTkFrame(right_panel, fg_color="transparent")
+        preview_container.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        preview_container.grid_columnconfigure(0, weight=1)
+        preview_container.grid_rowconfigure(0, weight=1)
+        
+        self.fits_preview_label = ctk.CTkLabel(preview_container, text="Select a FITS file to preview", text_color="gray")
+        self.fits_preview_label.grid(row=0, column=0, sticky="nsew")
+        
+        # Zoom buttons on the right
+        zoom_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
+        zoom_frame.grid(row=1, column=1, sticky="ns", padx=(0, 10), pady=10)
+        
+        self.zoom_in_btn = ctk.CTkButton(
+            zoom_frame, 
+            text="+", 
+            width=30, 
+            height=30,
+            font=self.get_font(14, weight="bold"),
+            command=self.zoom_fits_in
+        )
+        self.zoom_in_btn.pack(pady=(0, 5))
+        
+        self.zoom_level_label = ctk.CTkLabel(zoom_frame, text="100%", font=self.get_font(10), width=40)
+        self.zoom_level_label.pack(pady=5)
+        
+        self.zoom_out_btn = ctk.CTkButton(
+            zoom_frame, 
+            text="−", 
+            width=30, 
+            height=30,
+            font=self.get_font(14, weight="bold"),
+            command=self.zoom_fits_out
+        )
+        self.zoom_out_btn.pack(pady=(5, 0))
+        
+        # Navigation buttons below the list
+        nav_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        nav_frame.pack(fill="x", padx=5, pady=(0, 5))
+        
+        self.prev_btn = ctk.CTkButton(
+            nav_frame,
+            text="◀ Previous",
+            width=80,
+            font=self.get_font(11),
+            command=lambda: self.navigate_fits_files(-1)
+        )
+        self.prev_btn.pack(side="left", padx=2)
+        
+        self.next_btn = ctk.CTkButton(
+            nav_frame,
+            text="Next ▶",
+            width=80,
+            font=self.get_font(11),
+            command=lambda: self.navigate_fits_files(1)
+        )
+        self.next_btn.pack(side="right", padx=2)
         
         # Status bar
         self.fits_status_label = ctk.CTkLabel(self.fits_viewer_frame, text="Ready", text_color="gray")
@@ -915,6 +980,7 @@ class SeestarApp(ctk.CTk):
         self.fits_files = []
         self.selected_fits_index = -1
         self.marked_for_deletion = set()  # Set of indices marked for deletion
+        self.fits_zoom_level = 1.0  # Zoom level (0.3 to 4.0)
     
     def browse_fits_directory(self):
         """Browse for a directory containing FITS files."""
@@ -927,6 +993,8 @@ class SeestarApp(ctk.CTk):
         # Clear UI state first
         self.selected_fits_index = -1
         self.marked_for_deletion = set()
+        self.fits_zoom_level = 1.0  # Reset zoom to 100%
+        self._update_zoom_display()
         self.fits_preview_label.configure(text="Select a FITS file to preview", image=None)
         
         self.current_fits_directory = directory
@@ -944,8 +1012,10 @@ class SeestarApp(ctk.CTk):
             self.fits_file_listbox.selection_set(0)
             self.show_fits_preview(self.fits_files[0])
             self.fits_status_label.configure(text=f"{len(self.fits_files)} FITS files found - Showing {self.fits_files[0].name}")
+            self._update_nav_buttons()
         else:
             self.fits_status_label.configure(text="No FITS files found")
+            self._update_nav_buttons()
     
     def refresh_fits_file_list(self):
         """Refresh the file list display with marked status."""
@@ -970,6 +1040,7 @@ class SeestarApp(ctk.CTk):
             file_path = self.fits_files[index]
             self.show_fits_preview(file_path)
             self.fits_status_label.configure(text=f"Selected: {file_path.name}")
+            self._update_nav_buttons()
     
     def navigate_fits_files(self, direction):
         """Navigate through FITS files with keyboard."""
@@ -992,6 +1063,60 @@ class SeestarApp(ctk.CTk):
             file_path = self.fits_files[new_index]
             self.show_fits_preview(file_path)
             self.fits_status_label.configure(text=f"Selected: {file_path.name}")
+            self._update_nav_buttons()
+    
+    def zoom_fits_in(self):
+        """Zoom in on the FITS preview."""
+        if self.fits_zoom_level < 4.0:
+            self.fits_zoom_level = min(4.0, self.fits_zoom_level + 0.25)
+            self._update_zoom_display()
+            # Reload current image with new zoom
+            if self.selected_fits_index >= 0 and self.fits_files:
+                self.show_fits_preview(self.fits_files[self.selected_fits_index])
+    
+    def zoom_fits_out(self):
+        """Zoom out on the FITS preview."""
+        if self.fits_zoom_level > 0.3:
+            self.fits_zoom_level = max(0.3, self.fits_zoom_level - 0.25)
+            self._update_zoom_display()
+            # Reload current image with new zoom
+            if self.selected_fits_index >= 0 and self.fits_files:
+                self.show_fits_preview(self.fits_files[self.selected_fits_index])
+    
+    def _update_zoom_display(self):
+        """Update zoom level display and button states."""
+        percentage = int(self.fits_zoom_level * 100)
+        self.zoom_level_label.configure(text=f"{percentage}%")
+        
+        # Enable/disable buttons at limits
+        if self.fits_zoom_level >= 4.0:
+            self.zoom_in_btn.configure(state="disabled")
+        else:
+            self.zoom_in_btn.configure(state="normal")
+        
+        if self.fits_zoom_level <= 0.3:
+            self.zoom_out_btn.configure(state="disabled")
+        else:
+            self.zoom_out_btn.configure(state="normal")
+    
+    def _update_nav_buttons(self):
+        """Update navigation button states based on current position."""
+        if not self.fits_files:
+            self.prev_btn.configure(state="disabled")
+            self.next_btn.configure(state="disabled")
+            return
+        
+        # Disable prev button at first file
+        if self.selected_fits_index <= 0:
+            self.prev_btn.configure(state="disabled")
+        else:
+            self.prev_btn.configure(state="normal")
+        
+        # Disable next button at last file
+        if self.selected_fits_index >= len(self.fits_files) - 1:
+            self.next_btn.configure(state="disabled")
+        else:
+            self.next_btn.configure(state="normal")
     
     def toggle_mark_selected(self):
         """Toggle mark for deletion on currently selected file."""
@@ -1102,8 +1227,12 @@ class SeestarApp(ctk.CTk):
                         self.fits_preview_label.configure(text="Unsupported image format")
                     return
                 
-                # Resize to fit preview area (max 800x650)
-                img.thumbnail((800, 650), Image.Resampling.LANCZOS)
+                # Resize to fit preview area with zoom applied
+                # Base max size 800x650, multiplied by zoom level
+                base_width, base_height = 800, 650
+                zoomed_width = int(base_width * self.fits_zoom_level)
+                zoomed_height = int(base_height * self.fits_zoom_level)
+                img.thumbnail((zoomed_width, zoomed_height), Image.Resampling.LANCZOS)
                 
                 # Convert to CTkImage
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
