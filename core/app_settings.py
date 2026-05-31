@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, Optional
 import logging
 
+from .platform_utils import get_settings_dir
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -19,22 +21,16 @@ class AppSettings:
         """Initialize application settings storage.
         
         Args:
-            storage_path: Path to the JSON file for storing settings. Defaults to app_settings.json in the executable directory.
+            storage_path: Path to the JSON file for storing settings. 
+                         Defaults to platform-appropriate location:
+                         - Windows: %APPDATA%/SeestarFITS/app_settings.json
+                         - macOS: ~/Library/Application Support/SeestarFITS/app_settings.json
+                         - Linux: ~/.config/SeestarFITS/app_settings.json
         """
         if storage_path is None:
-            # Try to use the directory of the executable (if bundled) or the script
-            try:
-                # If running as a PyInstaller bundle
-                import sys
-                if getattr(sys, 'frozen', False):
-                    # Running as bundled executable
-                    storage_path = Path(sys.executable).parent / "app_settings.json"
-                else:
-                    # Running as script
-                    storage_path = Path(__file__).parent / "app_settings.json"
-            except Exception:
-                # Fallback to current directory
-                storage_path = Path.cwd() / "app_settings.json"
+            # Use platform-appropriate settings directory
+            settings_dir = get_settings_dir("SeestarFITS")
+            storage_path = settings_dir / "app_settings.json"
         
         self.storage_path = storage_path
         

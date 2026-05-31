@@ -21,6 +21,7 @@ import shutil
 
 # Import core business logic
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
+from core.platform_utils import IS_MACOS
 
 # Import UI components
 from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow
@@ -175,18 +176,19 @@ class SeestarApp(ctk.CTk):
         )
         help_menu_btn.grid(row=0, column=4, padx=2, pady=5)
         
-        # Exit Button (right-aligned)
-        exit_btn = ctk.CTkButton(
-            menu_bar,
-            text="❌ Exit",
-            font=self.get_font(12),
-            width=80,
-            fg_color="#C0392B",
-            hover_color="#A93226",
-            command=self.quit
-        )
-        exit_btn.grid(row=0, column=5, padx=(20, 2), pady=5, sticky="e")
-        menu_bar.grid_columnconfigure(5, weight=1)  # Push exit button to right
+        # Exit Button (right-aligned) - Hidden on Mac (use Cmd+Q instead)
+        if not IS_MACOS:
+            exit_btn = ctk.CTkButton(
+                menu_bar,
+                text="❌ Exit",
+                font=self.get_font(12),
+                width=80,
+                fg_color="#C0392B",
+                hover_color="#A93226",
+                command=self.quit
+            )
+            exit_btn.grid(row=0, column=5, padx=(20, 2), pady=5, sticky="e")
+            menu_bar.grid_columnconfigure(5, weight=1)  # Push exit button to right
         
         # Initialize mode tracking
         self.current_mode = None  # None, 'scan_build', 'analyze', 'settings', or 'fits_viewer'
@@ -1897,12 +1899,25 @@ class SeestarApp(ctk.CTk):
 
 def main():
     """Main entry point."""
-    # Configure root logger
+    # Configure root logger with both console and file handlers
+    from core.platform_utils import get_logs_dir
+    
+    # Get platform-appropriate logs directory
+    logs_dir = get_logs_dir("SeestarFITS")
+    log_file = logs_dir / "app.log"
+    
+    # Setup logging with both console and file output
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()  # Console output
+        ]
     )
+    
+    logger.info(f"Logging to: {log_file}")
     
     app = SeestarApp()
     app.mainloop()
