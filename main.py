@@ -23,7 +23,7 @@ import shutil
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
 
 # Import UI components
-from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow
+from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow, FileTypeSelectionDialog, detect_file_types_in_directories
 
 logger = logging.getLogger(__name__)
 
@@ -442,9 +442,36 @@ class SeestarApp(ctk.CTk):
                     self.after(0, lambda: self.set_ui_state(True))
                     return
                 
-                # Step 2: Copy selected folders from Seestar to Raw
+                # Step 2: Detect file types and show selection dialog BEFORE copying
+                self.after(0, lambda: self.progress_label.configure(text="Detecting file types..."))
+                file_type_counts = detect_file_types_in_directories(selected_folders)
+                
+                selected_file_types = None
+                if file_type_counts:
+                    # Show file type selection dialog (thread-safe)
+                    file_type_dialog_result = threading.Event()
+                    
+                    def show_file_type_dialog():
+                        nonlocal selected_file_types
+                        dialog = FileTypeSelectionDialog(self, file_type_counts)
+                        dialog.wait_window()
+                        if dialog.result == "process":
+                            selected_file_types = dialog.get_selected_types()
+                        file_type_dialog_result.set()
+                    
+                    # Show dialog on main thread and wait for result BEFORE copying
+                    self.after(0, show_file_type_dialog)
+                    file_type_dialog_result.wait()
+                    
+                    # If user cancelled file type selection, cancel the entire operation
+                    if selected_file_types is None:
+                        self.after(0, lambda: self.progress_label.configure(text="File type selection cancelled."))
+                        self.after(0, lambda: self.set_ui_state(True))
+                        return
+                
+                # Step 3: Copy selected folders from Seestar to Raw
                 self.after(0, lambda: self.progress_label.configure(text=f"Copying {len(selected_folders)} folders to Raw..."))
-                self.copy_seestar_to_raw(selected_folders)
+                self.copy_seestar_to_raw(selected_folders, selected_file_types)
                 
                 # For intermediate workflow, use the same selected folders (now in Raw) without asking again
                 # Convert Seestar folder paths to Raw folder paths
@@ -460,6 +487,7 @@ class SeestarApp(ctk.CTk):
             builder = ProjectBuilder(source_dir, self.projects_dir)
             
             # For direct workflow, show folder selection; for intermediate, use already-selected folders
+            selected_file_types = None
             if self.workflow_mode == "direct":
                 self.after(0, lambda: self.progress_label.configure(text="Discovering folders..."))
                 folders = builder.scan_raw_folders()
@@ -491,6 +519,25 @@ class SeestarApp(ctk.CTk):
                     self.after(0, lambda: self.set_ui_state(True))
                     return
                 
+                # Step 4: Detect file types and show selection dialog for direct mode
+                self.after(0, lambda: self.progress_label.configure(text="Detecting file types..."))
+                file_type_counts = detect_file_types_in_directories(selected_folders)
+                
+                if file_type_counts:
+                    # Show file type selection dialog (thread-safe)
+                    file_type_dialog_result = threading.Event()
+                    
+                    def show_file_type_dialog():
+                        nonlocal selected_file_types
+                        dialog = FileTypeSelectionDialog(self, file_type_counts)
+                        dialog.wait_window()
+                        if dialog.result == "process":
+                            selected_file_types = dialog.get_selected_types()
+                        file_type_dialog_result.set()
+                    
+                    self.after(0, show_file_type_dialog)
+                    file_type_dialog_result.wait()
+                
                 build_folders = selected_folders
             else:
                 # Intermediate workflow: use the folders we already selected and copied
@@ -500,7 +547,7 @@ class SeestarApp(ctk.CTk):
             
             # Step 1: Count total files to copy
             self.after(0, lambda: self.progress_label.configure(text="Counting files to copy..."))
-            total_files = builder.count_files_to_copy(selected_folders)
+            total_files = builder.count_files_to_copy(build_folders, selected_file_types)
             
             if total_files == 0:
                 self.after(0, lambda: self.progress_label.configure(text="No FITS files found in selected folders"))
@@ -519,8 +566,8 @@ class SeestarApp(ctk.CTk):
             # Step 2: Process folders with progress bar
             self.projects = []
             
-            for folder in selected_folders:
-                project = builder.build_project(folder, global_progress=global_progress)
+            for folder in build_folders:
+                project = builder.build_project(folder, global_progress=global_progress, selected_file_types=selected_file_types)
                 self.projects.append(project)
             
             self.after(0, lambda: self._update_copy_progress(total_files, total_files, 1.0, "Complete!"))
@@ -553,11 +600,13 @@ class SeestarApp(ctk.CTk):
         self.progress_label.configure(text=f"{message} ({current}/{total})")
         self.update_idletasks()  # Force UI update
     
-    def copy_seestar_to_raw(self, folders=None):
+    def copy_seestar_to_raw(self, folders=None, selected_file_types=None):
         """Copy <NAME>_sub folders from Seestar to Raw directory.
         
         Args:
             folders: Optional list of specific folders to copy. If None, copies all folders.
+            selected_file_types: Optional set of file extensions to copy (e.g., {'.fits', '.FIT'}).
+                               If None, copies all FITS files.
         """
         if not self.seestar_dir or not self.raw_dir:
             return
@@ -570,19 +619,28 @@ class SeestarApp(ctk.CTk):
                     folders.append(item)
         
         logger.info(f"Copying {len(folders)} folders from Seestar to Raw")
+        if selected_file_types:
+            logger.info(f"Filtering by file types: {selected_file_types}")
         
         for folder in folders:
             # Create corresponding folder in Raw
             raw_folder = self.raw_dir / folder.name
             raw_folder.mkdir(parents=True, exist_ok=True)
             
-            # Copy all FITS files
-            fits_files = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
+            # Get files based on selected file types
+            if selected_file_types:
+                # Copy only selected file types
+                files_to_copy = []
+                for ext in selected_file_types:
+                    files_to_copy.extend(list(folder.glob(f'*{ext}')))
+            else:
+                # Copy all FITS files (default behavior)
+                files_to_copy = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
             
             files_copied = 0
             files_skipped = 0
             
-            for fits_file in fits_files:
+            for fits_file in files_to_copy:
                 dest_file = raw_folder / fits_file.name
                 
                 if dest_file.exists():

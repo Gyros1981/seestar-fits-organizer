@@ -126,28 +126,38 @@ class ProjectBuilder:
                 folders.append(item)
         return folders
     
-    def count_files_to_copy(self, folders: List[Path]) -> int:
+    def count_files_to_copy(self, folders: List[Path], selected_file_types=None) -> int:
         """Count total FITS files to copy across multiple folders.
         
         Args:
             folders: List of source folders to count files in
+            selected_file_types: Optional set of file extensions to count (e.g., {'.fits', '.FIT'}).
+                                If None, counts all FITS files.
             
         Returns:
             Total number of FITS files found
         """
         total = 0
         for folder in folders:
-            fits_files = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
-            total += len(fits_files)
+            if selected_file_types:
+                # Count only selected file types
+                for ext in selected_file_types:
+                    total += len(list(folder.glob(f'*{ext}')))
+            else:
+                # Count all FITS files (default behavior)
+                fits_files = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
+                total += len(fits_files)
         return total
     
-    def build_project(self, source_folder: Path, progress_callback=None, global_progress=None) -> Project:
+    def build_project(self, source_folder: Path, progress_callback=None, global_progress=None, selected_file_types=None) -> Project:
         """Build a project from a source folder.
         
         Args:
             source_folder: Path to folder containing FITS files
             progress_callback: Optional callback(current, total, message) for project-level progress
             global_progress: Optional dict with 'current' and 'total' for cross-project progress tracking
+            selected_file_types: Optional set of file extensions to copy (e.g., {'.fits', '.FIT'}).
+                                If None, copies all FITS files.
         """
         # Extract project name from folder name
         # m3_subs or m3_sub -> M3_Project
@@ -167,8 +177,15 @@ class ProjectBuilder:
         # Create project object
         project = Project(project_name, source_folder, project_folder)
         
-        # Process FITS files
-        fits_files = list(source_folder.glob('*.fits')) + list(source_folder.glob('*.FIT'))
+        # Process FITS files based on selected file types
+        if selected_file_types:
+            # Get only selected file types
+            fits_files = []
+            for ext in selected_file_types:
+                fits_files.extend(list(source_folder.glob(f'*{ext}')))
+        else:
+            # Get all FITS files (default behavior)
+            fits_files = list(source_folder.glob('*.fits')) + list(source_folder.glob('*.FIT'))
         total_files = len(fits_files)
         
         for i, fits_path in enumerate(fits_files):
@@ -188,8 +205,19 @@ class ProjectBuilder:
                 frame = FitsFile(fits_path)
                 project.add_frame(frame)
                 
-                # Copy ALL FITS files to lights folder only
-                dest_folder = project_folder / 'lights'
+                # Copy FITS file to appropriate subfolder based on frame type
+                if frame.frame_type == 'LIGHT':
+                    dest_folder = project_folder / 'lights'
+                elif frame.frame_type == 'DARK':
+                    dest_folder = project_folder / 'darks'
+                elif frame.frame_type == 'FLAT':
+                    dest_folder = project_folder / 'flats'
+                elif frame.frame_type == 'BIAS':
+                    dest_folder = project_folder / 'biases'
+                else:
+                    # UNKNOWN or other types go to lights
+                    dest_folder = project_folder / 'lights'
+                
                 dest_file = dest_folder / fits_path.name
                 
                 if dest_folder.exists():
@@ -198,7 +226,7 @@ class ProjectBuilder:
                         logger.info(f"Skipping existing file: {fits_path.name}")
                     else:
                         copy2(fits_path, dest_file)
-                        logger.info(f"Copied: {fits_path.name}")
+                        logger.info(f"Copied: {fits_path.name} to {dest_folder.name}")
                     
             except Exception as e:
                 logger.warning(f"Failed to process {fits_path}: {e}")
