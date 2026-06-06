@@ -126,8 +126,29 @@ class ProjectBuilder:
                 folders.append(item)
         return folders
     
-    def build_project(self, source_folder: Path, progress_callback=None) -> Project:
-        """Build a project from a source folder."""
+    def count_files_to_copy(self, folders: List[Path]) -> int:
+        """Count total FITS files to copy across multiple folders.
+        
+        Args:
+            folders: List of source folders to count files in
+            
+        Returns:
+            Total number of FITS files found
+        """
+        total = 0
+        for folder in folders:
+            fits_files = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
+            total += len(fits_files)
+        return total
+    
+    def build_project(self, source_folder: Path, progress_callback=None, global_progress=None) -> Project:
+        """Build a project from a source folder.
+        
+        Args:
+            source_folder: Path to folder containing FITS files
+            progress_callback: Optional callback(current, total, message) for project-level progress
+            global_progress: Optional dict with 'current' and 'total' for cross-project progress tracking
+        """
         # Extract project name from folder name
         # m3_subs or m3_sub -> M3_Project
         folder_name = source_folder.name
@@ -151,8 +172,17 @@ class ProjectBuilder:
         total_files = len(fits_files)
         
         for i, fits_path in enumerate(fits_files):
+            # Update project-level progress
             if progress_callback:
                 progress_callback(i + 1, total_files, f"Processing {fits_path.name}")
+            
+            # Update global progress if provided
+            if global_progress is not None:
+                global_progress['current'] += 1
+                current = global_progress['current']
+                total = global_progress['total']
+                pct = current / total if total > 0 else 0
+                global_progress['callback'](current, total, pct, f"Copying {fits_path.name}")
             
             try:
                 frame = FitsFile(fits_path)

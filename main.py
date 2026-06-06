@@ -237,7 +237,12 @@ class SeestarApp(ctk.CTk):
         self.progress_frame.pack(fill="x", side="bottom", pady=(10, 0))
         
         self.progress_label = ctk.CTkLabel(self.progress_frame, text="Ready", text_color="gray")
-        self.progress_label.pack(anchor="w", padx=10, pady=(10, 10))
+        self.progress_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Progress bar for file operations
+        self.progress_bar = ctk.CTkProgressBar(self.progress_frame)
+        self.progress_bar.pack(fill="x", padx=10, pady=(0, 10))
+        self.progress_bar.set(0)  # 0 to 1
         
         # Right panel - Console Output
         self.right_panel = ctk.CTkFrame(self.content_frame)
@@ -359,6 +364,7 @@ class SeestarApp(ctk.CTk):
         
         self.set_ui_state(False)
         self.progress_label.configure(text="Scanning and building projects...")
+        self.progress_bar.set(0)  # Reset progress bar
         
         thread = threading.Thread(target=self.scan_and_build)
         thread.daemon = True
@@ -372,6 +378,7 @@ class SeestarApp(ctk.CTk):
         
         self.set_ui_state(False)
         self.progress_label.configure(text="Analyzing projects...")
+        self.progress_bar.set(0)  # Reset progress bar
         
         thread = threading.Thread(target=self.analyze_projects)
         thread.daemon = True
@@ -388,6 +395,7 @@ class SeestarApp(ctk.CTk):
         
         self.set_ui_state(False)
         self.progress_label.configure(text="Copying Planetary & Scenery media...")
+        self.progress_bar.set(0)  # Reset progress bar
         
         thread = threading.Thread(target=self.copy_planetary_scenery)
         thread.daemon = True
@@ -490,17 +498,32 @@ class SeestarApp(ctk.CTk):
                 # Verify the folders exist in Raw
                 build_folders = [f for f in build_folders if f.exists()]
             
-            # Process only selected folders
-            self.after(0, lambda: self.progress_label.configure(text=f"Building {len(selected_folders)} projects..."))
+            # Step 1: Count total files to copy
+            self.after(0, lambda: self.progress_label.configure(text="Counting files to copy..."))
+            total_files = builder.count_files_to_copy(selected_folders)
+            
+            if total_files == 0:
+                self.after(0, lambda: self.progress_label.configure(text="No FITS files found in selected folders"))
+                self.after(0, lambda: self.set_ui_state(True))
+                return
+            
+            self.after(0, lambda: self.progress_label.configure(text=f"Copying {total_files} files..."))
+            
+            # Set up global progress tracking
+            global_progress = {
+                'current': 0,
+                'total': total_files,
+                'callback': lambda cur, tot, pct, msg: self.after(0, lambda: self._update_copy_progress(cur, tot, pct, msg))
+            }
+            
+            # Step 2: Process folders with progress bar
             self.projects = []
             
-            for i, folder in enumerate(selected_folders):
-                self.after(0, lambda idx=i, total=len(selected_folders), fld=folder: 
-                          self.progress_label.configure(text=f"Processing {fld.name} ({idx+1}/{total})"))
-                
-                project = builder.build_project(folder)
+            for folder in selected_folders:
+                project = builder.build_project(folder, global_progress=global_progress)
                 self.projects.append(project)
             
+            self.after(0, lambda: self._update_copy_progress(total_files, total_files, 1.0, "Complete!"))
             self.after(0, lambda: self.progress_label.configure(text=f"Completed! Built {len(self.projects)} projects"))
             
             # Show completion dialog
@@ -516,6 +539,19 @@ class SeestarApp(ctk.CTk):
         
         finally:
             self.after(0, lambda: self.set_ui_state(True))
+    
+    def _update_copy_progress(self, current: int, total: int, percentage: float, message: str):
+        """Update the progress bar and label during file copy operations.
+        
+        Args:
+            current: Current file number being processed
+            total: Total number of files to copy
+            percentage: Progress as a float from 0.0 to 1.0
+            message: Status message to display
+        """
+        self.progress_bar.set(percentage)
+        self.progress_label.configure(text=f"{message} ({current}/{total})")
+        self.update_idletasks()  # Force UI update
     
     def copy_seestar_to_raw(self, folders=None):
         """Copy <NAME>_sub folders from Seestar to Raw directory.
@@ -571,6 +607,7 @@ class SeestarApp(ctk.CTk):
             results = analyzer.analyze_all()
             
             # Update UI on main thread
+            self.after(0, lambda: self.progress_bar.set(1.0))  # Complete progress bar
             self.after(0, lambda: self.progress_label.configure(
                 text=f"Analysis complete: {results.total_projects} projects, {results.total_lights} lights"
             ))
@@ -585,6 +622,10 @@ class SeestarApp(ctk.CTk):
         
         finally:
             self.after(0, lambda: self.set_ui_state(True))
+    
+    def reset_progress(self):
+        """Reset progress bar to 0."""
+        self.progress_bar.set(0)
     
     def copy_planetary_scenery(self):
         """Copy Planetary & Scenery media from Seestar to target."""
@@ -631,6 +672,7 @@ class SeestarApp(ctk.CTk):
                     ))
             
             # Show completion
+            self.after(0, lambda: self.progress_bar.set(1.0))  # Complete progress bar
             self.after(0, lambda: self.progress_label.configure(
                 text=f"✓ Copied {copied_files} files, skipped {skipped_files}"
             ))
