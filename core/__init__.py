@@ -11,6 +11,7 @@ from .fits_metadata import FitsMetadata
 from .frame_classifier import FrameClassifier, FrameType
 from .project_builder import ProjectBuilder, Project, ProjectMetrics, FitsFile
 from .project_analyzer import ProjectAnalyzer, ProjectAnalysis, AggregateAnalysis
+from .utils import get_storage_path, setup_logging
 
 __all__ = [
     'AppSettings',
@@ -24,5 +25,7 @@ __all__ = [
     'FitsFile',
     'ProjectAnalyzer',
     'ProjectAnalysis',
-    'AggregateAnalysis'
+    'AggregateAnalysis',
+    'get_storage_path',
+    'setup_logging'
 ]

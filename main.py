@@ -435,21 +435,8 @@ class SeestarApp(ctk.CTk):
                     self.after(0, lambda: self.set_ui_state(True))
                     return
                 
-                # Show folder selection dialog for copying (thread-safe)
-                selected_folders = []
-                dialog_result = threading.Event()
-                
-                def show_folder_dialog():
-                    nonlocal selected_folders
-                    dialog = FolderSelectionWindow(self, seestar_folders)
-                    dialog.wait_window()
-                    if dialog.result == "process":
-                        selected_folders = dialog.get_selected_folders()
-                    dialog_result.set()
-                
-                # Show dialog on main thread and wait for result
-                self.after(0, show_folder_dialog)
-                dialog_result.wait()
+                # Show folder selection dialog
+                selected_folders = self._show_folder_selection_dialog(seestar_folders)
                 
                 if not selected_folders:
                     self.after(0, lambda: self.progress_label.configure(text="No folders selected. Cancelled."))
@@ -462,20 +449,7 @@ class SeestarApp(ctk.CTk):
                 
                 selected_file_types = None
                 if file_type_counts:
-                    # Show file type selection dialog (thread-safe)
-                    file_type_dialog_result = threading.Event()
-                    
-                    def show_file_type_dialog():
-                        nonlocal selected_file_types
-                        dialog = FileTypeSelectionDialog(self, file_type_counts)
-                        dialog.wait_window()
-                        if dialog.result == "process":
-                            selected_file_types = dialog.get_selected_types()
-                        file_type_dialog_result.set()
-                    
-                    # Show dialog on main thread and wait for result BEFORE copying
-                    self.after(0, show_file_type_dialog)
-                    file_type_dialog_result.wait()
+                    selected_file_types = self._show_file_type_selection_dialog(file_type_counts)
                     
                     # If user cancelled file type selection, cancel the entire operation
                     if selected_file_types is None:
@@ -512,21 +486,8 @@ class SeestarApp(ctk.CTk):
                     self.after(0, lambda: self.set_ui_state(True))
                     return
                 
-                # Show folder selection dialog (thread-safe)
-                selected_folders = []
-                dialog_result = threading.Event()
-                
-                def show_folder_dialog():
-                    nonlocal selected_folders
-                    dialog = FolderSelectionWindow(self, folders)
-                    dialog.wait_window()
-                    if dialog.result == "process":
-                        selected_folders = dialog.get_selected_folders()
-                    dialog_result.set()
-                
-                # Show dialog on main thread and wait for result
-                self.after(0, show_folder_dialog)
-                dialog_result.wait()
+                # Show folder selection dialog
+                selected_folders = self._show_folder_selection_dialog(folders)
                 
                 if not selected_folders:
                     self.after(0, lambda: self.progress_label.configure(text="No folders selected. Cancelled."))
@@ -538,19 +499,7 @@ class SeestarApp(ctk.CTk):
                 file_type_counts = detect_file_types_in_directories(selected_folders)
                 
                 if file_type_counts:
-                    # Show file type selection dialog (thread-safe)
-                    file_type_dialog_result = threading.Event()
-                    
-                    def show_file_type_dialog():
-                        nonlocal selected_file_types
-                        dialog = FileTypeSelectionDialog(self, file_type_counts)
-                        dialog.wait_window()
-                        if dialog.result == "process":
-                            selected_file_types = dialog.get_selected_types()
-                        file_type_dialog_result.set()
-                    
-                    self.after(0, show_file_type_dialog)
-                    file_type_dialog_result.wait()
+                    selected_file_types = self._show_file_type_selection_dialog(file_type_counts)
                 
                 build_folders = selected_folders
             else:
@@ -1880,6 +1829,58 @@ class SeestarApp(ctk.CTk):
     def _end_resize(self, event):
         """End resizing when mouse button is released."""
         self._resizing = False
+    
+    def _show_folder_selection_dialog(self, folders: list) -> list:
+        """Show folder selection dialog and return selected folders.
+        
+        Args:
+            folders: List of folder paths to show in dialog
+            
+        Returns:
+            List of selected folders, or empty list if cancelled
+        """
+        selected_folders = []
+        dialog_result = threading.Event()
+        
+        def show_folder_dialog():
+            nonlocal selected_folders
+            dialog = FolderSelectionWindow(self, folders)
+            dialog.wait_window()
+            if dialog.result == "process":
+                selected_folders = dialog.get_selected_folders()
+            dialog_result.set()
+        
+        # Show dialog on main thread and wait for result
+        self.after(0, show_folder_dialog)
+        dialog_result.wait()
+        
+        return selected_folders
+    
+    def _show_file_type_selection_dialog(self, file_type_counts: dict) -> set:
+        """Show file type selection dialog and return selected file types.
+        
+        Args:
+            file_type_counts: Dictionary mapping file extensions to counts
+            
+        Returns:
+            Set of selected file extensions, or None if cancelled
+        """
+        selected_file_types = None
+        file_type_dialog_result = threading.Event()
+        
+        def show_file_type_dialog():
+            nonlocal selected_file_types
+            dialog = FileTypeSelectionDialog(self, file_type_counts)
+            dialog.wait_window()
+            if dialog.result == "process":
+                selected_file_types = dialog.get_selected_types()
+            file_type_dialog_result.set()
+        
+        # Show dialog on main thread and wait for result
+        self.after(0, show_file_type_dialog)
+        file_type_dialog_result.wait()
+        
+        return selected_file_types
     
     def show_import_menu(self):
         """Show Import menu dropdown."""
