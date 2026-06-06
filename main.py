@@ -195,12 +195,26 @@ class SeestarApp(ctk.CTk):
         self.content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         self.content_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
         self.content_frame.grid_columnconfigure(0, weight=2)
-        self.content_frame.grid_columnconfigure(1, weight=1)
+        self.content_frame.grid_columnconfigure(1, weight=0)  # Separator doesn't expand
+        self.content_frame.grid_columnconfigure(2, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=1)
         
         # Normal mode panel (left side - for scan/build and analyze)
         self.left_panel = ctk.CTkFrame(self.content_frame)
-        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 0))
+        
+        # Resizable separator
+        self.separator = ctk.CTkFrame(self.content_frame, width=6, fg_color="#3a3a3a", cursor="sb_h_double_arrow")
+        self.separator.grid(row=0, column=1, sticky="ns")
+        
+        # Bind mouse events for dragging
+        self.separator.bind("<Button-1>", self._start_resize)
+        self.separator.bind("<B1-Motion>", self._on_resize)
+        self.separator.bind("<ButtonRelease-1>", self._end_resize)
+        
+        self._resizing = False
+        self._resize_start_x = 0
+        self._resize_start_width = 0
         
         # Create mode frames (hidden initially)
         self._create_scan_build_frame()
@@ -246,7 +260,7 @@ class SeestarApp(ctk.CTk):
         
         # Right panel - Console Output
         self.right_panel = ctk.CTkFrame(self.content_frame)
-        self.right_panel.grid(row=0, column=1, sticky="nsew")
+        self.right_panel.grid(row=0, column=2, sticky="nsew")
         
         console_label = ctk.CTkLabel(self.right_panel, text="Console Output", font=self.get_font(14, weight="bold"))
         console_label.pack(anchor="w", padx=10, pady=(10, 5))
@@ -1726,11 +1740,13 @@ class SeestarApp(ctk.CTk):
         self.current_mode = mode
         
         if mode == 'settings':
-            # Hide normal mode panels, show settings full width
+            # Hide normal mode panels, show settings in left panel only
             self.left_panel.grid_forget()
-            self.right_panel.grid_forget()
             self.fits_viewer_frame.grid_forget()
-            self.settings_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=20, pady=10)
+            # Keep separator and right_panel (console) visible
+            self.separator.grid(row=0, column=1, sticky="ns")
+            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            self.settings_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=10)
             self.progress_label.configure(text="Settings mode - configure app settings and click Save")
             
             # Refresh disclaimer switch state (may have changed via disclaimer dialog)
@@ -1739,18 +1755,22 @@ class SeestarApp(ctk.CTk):
             else:
                 self.disclaimer_switch.deselect()
         elif mode == 'fits_viewer':
-            # Hide normal mode panels, show fits viewer full width
+            # Hide normal mode panels, show fits viewer in left panel only
             self.left_panel.grid_forget()
-            self.right_panel.grid_forget()
             self.settings_frame.grid_forget()
-            self.fits_viewer_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+            # Keep separator and right_panel (console) visible
+            self.separator.grid(row=0, column=1, sticky="ns")
+            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            self.fits_viewer_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
             self.progress_label.configure(text="FITS Viewer - browse and preview FITS files")
         else:
             # Hide settings and fits viewer, show normal layout
             self.settings_frame.grid_forget()
             self.fits_viewer_frame.grid_forget()
+            # Ensure separator and right_panel are visible
+            self.separator.grid(row=0, column=1, sticky="ns")
+            self.right_panel.grid(row=0, column=2, sticky="nsew")
             self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-            self.right_panel.grid(row=0, column=1, sticky="nsew")
             
             # Hide all content frames in left panel
             self.welcome_frame.pack_forget()
@@ -1821,6 +1841,45 @@ class SeestarApp(ctk.CTk):
                 if menu and menu.winfo_exists():
                     menu.destroy()
                     setattr(self, attr, None)
+    
+    def _start_resize(self, event):
+        """Start resizing the panels when separator is clicked."""
+        self._resizing = True
+        self._resize_start_x = event.x_root
+        self._resize_start_width = self.left_panel.winfo_width()
+    
+    def _on_resize(self, event):
+        """Handle panel resizing during drag."""
+        if not self._resizing:
+            return
+        
+        # Calculate the delta in pixels
+        delta = event.x_root - self._resize_start_x
+        
+        # Calculate new width for left panel
+        new_width = self._resize_start_width + delta
+        
+        # Set minimum and maximum widths (in pixels)
+        min_width = 200
+        max_width = self.content_frame.winfo_width() - 200 - self.separator.winfo_width()
+        
+        # Clamp the width
+        new_width = max(min_width, min(new_width, max_width))
+        
+        # Calculate the new grid column weights based on the new width
+        total_width = self.content_frame.winfo_width()
+        if total_width > 0:
+            separator_width = self.separator.winfo_width()
+            left_weight = new_width / total_width
+            right_weight = (total_width - new_width - separator_width) / total_width
+            
+            # Update grid column weights (must be integers)
+            self.content_frame.grid_columnconfigure(0, weight=int(left_weight * 100))
+            self.content_frame.grid_columnconfigure(2, weight=int(right_weight * 100))
+    
+    def _end_resize(self, event):
+        """End resizing when mouse button is released."""
+        self._resizing = False
     
     def show_import_menu(self):
         """Show Import menu dropdown."""
