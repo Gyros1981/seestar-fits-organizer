@@ -130,11 +130,14 @@ class ProjectAnalyzer:
     def __init__(self, projects_dir: Path):
         self.projects_dir = projects_dir
     
-    def analyze_all(self) -> AggregateAnalysis:
+    def analyze_all(self, progress_callback=None) -> AggregateAnalysis:
         """Analyze all projects in the projects directory.
         
         First tries to find _Project folders. If none found, falls back to
         any directory containing FITS files (one level deep only).
+        
+        Args:
+            progress_callback: Optional callback function(current, total, percentage, message)
         """
         aggregate = AggregateAnalysis()
         
@@ -180,8 +183,15 @@ class ProjectAnalyzer:
             logger.warning(f"No project folders found in {self.projects_dir}")
             return aggregate
         
-        for folder in project_folders:
+        total_folders = len(project_folders)
+        
+        for idx, folder in enumerate(project_folders, 1):
             try:
+                # Update progress if callback provided
+                if progress_callback:
+                    percentage = idx / total_folders
+                    progress_callback(idx, total_folders, percentage, f"Analyzing {folder.name}...")
+                
                 project_analysis = self.analyze_project(folder)
                 aggregate.add_project(project_analysis)
                 logger.info(f"Analyzed {folder.name}: {project_analysis.total_files} files")
