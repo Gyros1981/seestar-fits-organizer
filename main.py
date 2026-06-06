@@ -20,7 +20,7 @@ import logging
 import shutil
 
 # Import core business logic
-from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
+from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer, setup_logging
 
 # Import UI components
 from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow, FileTypeSelectionDialog, detect_file_types_in_directories
@@ -2057,12 +2057,8 @@ class SeestarApp(ctk.CTk):
 
 def main():
     """Main entry point."""
-    # Configure root logger
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    # Configure root logger using centralized setup
+    setup_logging(level=logging.INFO)
     
     app = SeestarApp()
     app.mainloop()
