@@ -65,6 +65,65 @@ class SeestarApp(ctk.CTk):
         """Show the disclaimer window."""
         DisclaimerWindow(self, self.settings)
     
+    def _create_menu_item(self, parent, text, font, command):
+        """Create a traditional menu item button.
+        
+        Args:
+            parent: Parent widget
+            text: Button text
+            font: Font to use
+            command: Command to execute on click
+            
+        Returns:
+            CTkButton configured as a menu item
+        """
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            font=font,
+            height=30,
+            fg_color="transparent",
+            hover_color="#3a3a3a",
+            border_width=0,
+            text_color="white",
+            cursor="hand2",
+            command=command
+        )
+    
+    def _create_dropdown_menu_item(self, parent, text, command):
+        """Create a traditional dropdown menu item (looks like text, not button).
+        
+        Args:
+            parent: Parent widget
+            text: Menu item text
+            command: Command to execute on click
+            
+        Returns:
+            CTkButton configured as a menu item with transparent styling
+        """
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            font=self.get_font(12),
+            height=28,
+            fg_color="#454545",
+            hover_color="#5A5A5A",
+            border_width=0,
+            text_color="white",
+            anchor="w",
+            cursor="hand2",
+            command=command
+        )
+    
+    def _create_menu_separator(self, parent):
+        """Create a separator line between menu items.
+        
+        Args:
+            parent: Parent widget
+        """
+        separator = ctk.CTkFrame(parent, height=1, fg_color="#505050")
+        separator.pack(fill="x", padx=5, pady=2)
+    
     def get_font(self, size: int, weight: str = None):
         """Get a CTkFont with text scaling applied.
         
@@ -113,8 +172,8 @@ class SeestarApp(ctk.CTk):
         main_frame.grid_rowconfigure(1, weight=1)  # Content frame expands
         
         # Menu bar frame at top (fixed height)
-        menu_bar = ctk.CTkFrame(main_frame, height=45, fg_color="transparent")
-        menu_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        menu_bar = ctk.CTkFrame(main_frame, height=35, fg_color="#2B2B2B")
+        menu_bar.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         menu_bar.grid_propagate(False)  # Keep fixed height
         
         # Home Button (leftmost)
@@ -123,62 +182,72 @@ class SeestarApp(ctk.CTk):
             text="🏠",
             font=self.get_font(14),
             width=40,
-            command=lambda: self.show_mode('welcome')
+            height=30,
+            fg_color="transparent",
+            hover_color="#3a3a3a",
+            border_width=0,
+            command=lambda: (self.destroy_all_menus(), self.show_mode('welcome'))
         )
-        home_btn.grid(row=0, column=0, padx=2, pady=5)
+        home_btn.grid(row=0, column=0, padx=5, pady=2)
         
-        # Import Menu (for transferring files from Seestar)
-        import_menu_btn = ctk.CTkButton(
+        # Import Menu
+        self.import_menu_btn = self._create_menu_item(
             menu_bar,
-            text="📥 Import",
+            text="Import ▼",
             font=self.get_font(12),
-            width=80,
             command=self.show_import_menu
         )
-        import_menu_btn.grid(row=0, column=1, padx=2, pady=5)
+        self.import_menu_btn.grid(row=0, column=1, padx=5, pady=2)
         
         # Tools Menu
-        tools_menu_btn = ctk.CTkButton(
+        self.tools_menu_btn = self._create_menu_item(
             menu_bar,
-            text="🔧 Tools",
+            text="Tools ▼",
             font=self.get_font(12),
-            width=80,
             command=self.show_tools_menu
         )
-        tools_menu_btn.grid(row=0, column=2, padx=2, pady=5)
-        
-        # Settings Button (direct)
-        settings_btn = ctk.CTkButton(
-            menu_bar,
-            text="⚙️ Settings",
-            font=self.get_font(12),
-            width=100,
-            command=lambda: self.show_mode('settings')
-        )
-        settings_btn.grid(row=0, column=3, padx=2, pady=5)
+        self.tools_menu_btn.grid(row=0, column=2, padx=5, pady=2)
         
         # Help Menu
-        help_menu_btn = ctk.CTkButton(
+        self.help_menu_btn = self._create_menu_item(
             menu_bar,
-            text="❓ Help",
+            text="Help ▼",
             font=self.get_font(12),
-            width=80,
             command=self.show_help_menu
         )
-        help_menu_btn.grid(row=0, column=4, padx=2, pady=5)
+        self.help_menu_btn.grid(row=0, column=3, padx=5, pady=2)
+        
+        # Configure column 4 to expand (spacer)
+        menu_bar.grid_columnconfigure(4, weight=1)
+        
+        # Settings Button (right side)
+        settings_btn = ctk.CTkButton(
+            menu_bar,
+            text="⚙️",
+            font=self.get_font(14),
+            width=40,
+            height=30,
+            fg_color="transparent",
+            hover_color="#3a3a3a",
+            border_width=0,
+            command=lambda: (self.destroy_all_menus(), self.show_mode('settings'))
+        )
+        settings_btn.grid(row=0, column=5, padx=5, pady=2)
         
         # Exit Button (right-aligned)
         exit_btn = ctk.CTkButton(
             menu_bar,
-            text="❌ Exit",
+            text="Exit",
             font=self.get_font(12),
-            width=80,
-            fg_color="#C0392B",
-            hover_color="#A93226",
+            width=60,
+            height=30,
+            fg_color="transparent",
+            hover_color="#C0392B",
+            text_color="#C0392B",
+            border_width=0,
             command=self.quit
         )
-        exit_btn.grid(row=0, column=5, padx=(20, 2), pady=5, sticky="e")
-        menu_bar.grid_columnconfigure(5, weight=1)  # Push exit button to right
+        exit_btn.grid(row=0, column=6, padx=(0, 5), pady=2)
         
         # Initialize mode tracking
         self.current_mode = None  # None, 'scan_build', 'analyze', 'settings', or 'fits_viewer'
@@ -1893,11 +1962,15 @@ class SeestarApp(ctk.CTk):
         
         self._import_menu = ctk.CTkToplevel(self)
         menu = self._import_menu
-        # Position below Import button (y + 40 to be below the button)
-        menu.geometry(f"200x130+{self.winfo_x() + 20}+{self.winfo_y() + 45}")
+        # Position directly under Import button
+        btn_x = self.import_menu_btn.winfo_rootx()
+        btn_y = self.import_menu_btn.winfo_rooty()
+        btn_height = self.import_menu_btn.winfo_height()
+        menu.geometry(f"220x110+{btn_x}+{btn_y + btn_height}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
+        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
         
         def close_menu():
             if hasattr(self, '_import_menu') and self._import_menu and self._import_menu.winfo_exists():
@@ -1921,12 +1994,11 @@ class SeestarApp(ctk.CTk):
             self.lift()
             self.after(100, lambda: self.show_mode('planetary_scenery'))
         
-        ctk.CTkButton(menu, text="� Direct", 
-                     command=direct_flow).pack(fill="x", padx=10, pady=2)
-        ctk.CTkButton(menu, text="📁 Intermediate", 
-                     command=intermediate_flow).pack(fill="x", padx=10, pady=2)
-        ctk.CTkButton(menu, text="🌙 Copy Planetary & Scenery", 
-                     command=planetary_scenery_flow).pack(fill="x", padx=10, pady=2)
+        self._create_dropdown_menu_item(menu, "Direct", direct_flow).pack(fill="x", padx=5, pady=2)
+        self._create_menu_separator(menu)
+        self._create_dropdown_menu_item(menu, "Intermediate", intermediate_flow).pack(fill="x", padx=5, pady=2)
+        self._create_menu_separator(menu)
+        self._create_dropdown_menu_item(menu, "Copy Planetary & Scenery", planetary_scenery_flow).pack(fill="x", padx=5, pady=2)
         
         # Close on Escape
         menu.bind("<Escape>", lambda e: close_menu())
@@ -1943,11 +2015,15 @@ class SeestarApp(ctk.CTk):
         
         self._tools_menu = ctk.CTkToplevel(self)
         menu = self._tools_menu
-        # Position below Tools button (y + 40 to be below the button)
-        menu.geometry(f"200x90+{self.winfo_x() + 110}+{self.winfo_y() + 45}")
+        # Position directly under Tools button
+        btn_x = self.tools_menu_btn.winfo_rootx()
+        btn_y = self.tools_menu_btn.winfo_rooty()
+        btn_height = self.tools_menu_btn.winfo_height()
+        menu.geometry(f"200x70+{btn_x}+{btn_y + btn_height}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
+        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
         
         def close_menu():
             if hasattr(self, '_tools_menu') and self._tools_menu and self._tools_menu.winfo_exists():
@@ -1964,10 +2040,9 @@ class SeestarApp(ctk.CTk):
             self.lift()
             self.after(100, lambda: self.show_mode('analyze'))
         
-        ctk.CTkButton(menu, text="🪐 Analyze Projects",
-                     command=analyze_and_close).pack(fill="x", padx=10, pady=5)
-        ctk.CTkButton(menu, text="🖼️ FITS Viewer",
-                     command=fits_viewer_and_close).pack(fill="x", padx=10, pady=5)
+        self._create_dropdown_menu_item(menu, "Analyze Projects", analyze_and_close).pack(fill="x", padx=5, pady=2)
+        self._create_menu_separator(menu)
+        self._create_dropdown_menu_item(menu, "FITS Viewer", fits_viewer_and_close).pack(fill="x", padx=5, pady=2)
         
         menu.bind("<Escape>", lambda e: close_menu())
         menu.focus_set()
@@ -1983,11 +2058,15 @@ class SeestarApp(ctk.CTk):
         
         self._help_menu = ctk.CTkToplevel(self)
         menu = self._help_menu
-        # Position below Help button (y + 40 to be below the button)
-        menu.geometry(f"150x60+{self.winfo_x() + 310}+{self.winfo_y() + 45}")
+        # Position directly under Help button
+        btn_x = self.help_menu_btn.winfo_rootx()
+        btn_y = self.help_menu_btn.winfo_rooty()
+        btn_height = self.help_menu_btn.winfo_height()
+        menu.geometry(f"150x40+{btn_x}+{btn_y + btn_height}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
+        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
         
         def close_menu():
             if hasattr(self, '_help_menu') and self._help_menu and self._help_menu.winfo_exists():
@@ -1999,8 +2078,7 @@ class SeestarApp(ctk.CTk):
             self.lift()
             self.after(100, lambda: self.show_mode('about'))
         
-        ctk.CTkButton(menu, text="ℹ️ About", 
-                     command=about_and_close).pack(fill="x", padx=10, pady=5)
+        self._create_dropdown_menu_item(menu, "About", about_and_close).pack(fill="x", padx=5, pady=2)
         
         menu.bind("<Escape>", lambda e: close_menu())
         menu.focus_set()
