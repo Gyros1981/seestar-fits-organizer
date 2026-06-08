@@ -81,11 +81,11 @@ class SeestarApp(ctk.CTk):
             parent,
             text=text,
             font=font,
-            height=30,
+            height=28,
             fg_color="transparent",
-            hover_color="#3a3a3a",
+            hover_color="#D35400",
             border_width=0,
-            text_color="white",
+            text_color="black",
             cursor="hand2",
             command=command
         )
@@ -106,10 +106,10 @@ class SeestarApp(ctk.CTk):
             text=text,
             font=self.get_font(12),
             height=28,
-            fg_color="#454545",
-            hover_color="#5A5A5A",
+            fg_color="#E67E22",
+            hover_color="#D35400",
             border_width=0,
-            text_color="white",
+            text_color="black",
             anchor="w",
             cursor="hand2",
             command=command
@@ -121,7 +121,7 @@ class SeestarApp(ctk.CTk):
         Args:
             parent: Parent widget
         """
-        separator = ctk.CTkFrame(parent, height=1, fg_color="#505050")
+        separator = ctk.CTkFrame(parent, height=1, fg_color="#D35400")
         separator.pack(fill="x", padx=5, pady=2)
     
     def get_font(self, size: int, weight: str = None):
@@ -172,7 +172,7 @@ class SeestarApp(ctk.CTk):
         main_frame.grid_rowconfigure(1, weight=1)  # Content frame expands
         
         # Menu bar frame at top (fixed height)
-        menu_bar = ctk.CTkFrame(main_frame, height=35, fg_color="#2B2B2B")
+        menu_bar = ctk.CTkFrame(main_frame, height=35, fg_color="#E67E22")
         menu_bar.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         menu_bar.grid_propagate(False)  # Keep fixed height
         
@@ -181,41 +181,42 @@ class SeestarApp(ctk.CTk):
             menu_bar,
             text="🏠",
             font=self.get_font(14),
-            width=40,
-            height=30,
+            width=35,
+            height=28,
             fg_color="transparent",
-            hover_color="#3a3a3a",
+            hover_color="#D35400",
             border_width=0,
+            text_color="black",
             command=lambda: (self.destroy_all_menus(), self.show_mode('welcome'))
         )
-        home_btn.grid(row=0, column=0, padx=5, pady=2)
+        home_btn.grid(row=0, column=0, padx=2, pady=2)
         
         # Import Menu
         self.import_menu_btn = self._create_menu_item(
             menu_bar,
             text="Import ▼",
-            font=self.get_font(12),
+            font=self.get_font(13),
             command=self.show_import_menu
         )
-        self.import_menu_btn.grid(row=0, column=1, padx=5, pady=2)
+        self.import_menu_btn.grid(row=0, column=1, padx=2, pady=2)
         
         # Tools Menu
         self.tools_menu_btn = self._create_menu_item(
             menu_bar,
             text="Tools ▼",
-            font=self.get_font(12),
+            font=self.get_font(13),
             command=self.show_tools_menu
         )
-        self.tools_menu_btn.grid(row=0, column=2, padx=5, pady=2)
+        self.tools_menu_btn.grid(row=0, column=2, padx=2, pady=2)
         
         # Help Menu
         self.help_menu_btn = self._create_menu_item(
             menu_bar,
             text="Help ▼",
-            font=self.get_font(12),
+            font=self.get_font(13),
             command=self.show_help_menu
         )
-        self.help_menu_btn.grid(row=0, column=3, padx=5, pady=2)
+        self.help_menu_btn.grid(row=0, column=3, padx=2, pady=2)
         
         # Configure column 4 to expand (spacer)
         menu_bar.grid_columnconfigure(4, weight=1)
@@ -225,29 +226,15 @@ class SeestarApp(ctk.CTk):
             menu_bar,
             text="⚙️",
             font=self.get_font(14),
-            width=40,
-            height=30,
+            width=35,
+            height=28,
             fg_color="transparent",
-            hover_color="#3a3a3a",
+            hover_color="#D35400",
             border_width=0,
+            text_color="black",
             command=lambda: (self.destroy_all_menus(), self.show_mode('settings'))
         )
-        settings_btn.grid(row=0, column=5, padx=5, pady=2)
-        
-        # Exit Button (right-aligned)
-        exit_btn = ctk.CTkButton(
-            menu_bar,
-            text="Exit",
-            font=self.get_font(12),
-            width=60,
-            height=30,
-            fg_color="transparent",
-            hover_color="#C0392B",
-            text_color="#C0392B",
-            border_width=0,
-            command=self.quit
-        )
-        exit_btn.grid(row=0, column=6, padx=(0, 5), pady=2)
+        settings_btn.grid(row=0, column=5, padx=2, pady=2)
         
         # Initialize mode tracking
         self.current_mode = None  # None, 'scan_build', 'analyze', 'settings', or 'fits_viewer'
@@ -1970,7 +1957,7 @@ class SeestarApp(ctk.CTk):
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
+        menu.configure(fg_color="#E67E22")  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_import_menu') and self._import_menu and self._import_menu.winfo_exists():
@@ -2023,7 +2010,7 @@ class SeestarApp(ctk.CTk):
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
+        menu.configure(fg_color="#E67E22")  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_tools_menu') and self._tools_menu and self._tools_menu.winfo_exists():
@@ -2062,22 +2049,29 @@ class SeestarApp(ctk.CTk):
         btn_x = self.help_menu_btn.winfo_rootx()
         btn_y = self.help_menu_btn.winfo_rooty()
         btn_height = self.help_menu_btn.winfo_height()
-        menu.geometry(f"150x40+{btn_x}+{btn_y + btn_height}")
+        menu.geometry(f"200x70+{btn_x}+{btn_y + btn_height}")
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#3C3C3C")  # Windows menu background color
+        menu.configure(fg_color="#E67E22")  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_help_menu') and self._help_menu and self._help_menu.winfo_exists():
                 self._help_menu.destroy()
             self._help_menu = None
         
+        def open_docs():
+            import webbrowser
+            webbrowser.open("https://docs.google.com/document/d/1ZjtI4f97ZZ3ev8C_yMDOoG3-o8_H4E_rZu3ecQxJZy0/edit?tab=t.hewxpg77x81j")
+            close_menu()
+        
         def about_and_close():
             close_menu()
             self.lift()
             self.after(100, lambda: self.show_mode('about'))
         
+        self._create_dropdown_menu_item(menu, "Documentation", open_docs).pack(fill="x", padx=5, pady=2)
+        self._create_menu_separator(menu)
         self._create_dropdown_menu_item(menu, "About", about_and_close).pack(fill="x", padx=5, pady=2)
         
         menu.bind("<Escape>", lambda e: close_menu())
