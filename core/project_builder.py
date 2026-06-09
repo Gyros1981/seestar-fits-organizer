@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict
 from shutil import copy2
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from .fits_metadata import FitsMetadata
 from .frame_classifier import FrameClassifier, FrameType
 
@@ -188,7 +189,32 @@ class ProjectBuilder:
             fits_files = list(source_folder.glob('*.fits')) + list(source_folder.glob('*.FIT'))
         total_files = len(fits_files)
         
-        for i, fits_path in enumerate(fits_files):
+        # Batch metadata extraction in parallel
+        def extract_metadata_and_classify(fits_path):
+            """Extract metadata and classify a single FITS file."""
+            try:
+                frame = FitsFile(fits_path)
+                return (fits_path, frame, None)
+            except Exception as e:
+                return (fits_path, None, str(e))
+        
+        # Extract metadata in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            metadata_futures = []
+            for fits_path in fits_files:
+                metadata_futures.append(executor.submit(extract_metadata_and_classify, fits_path))
+            
+            # Collect results
+            processed_files = []
+            for future in metadata_futures:
+                fits_path, frame, error = future.result()
+                if error:
+                    logger.warning(f"Failed to process {fits_path}: {error}")
+                    continue
+                processed_files.append((fits_path, frame))
+        
+        # Now copy files based on classification (this is sequential but metadata is already extracted)
+        for i, (fits_path, frame) in enumerate(processed_files):
             # Update project-level progress
             if progress_callback:
                 progress_callback(i + 1, total_files, f"Processing {fits_path.name}")
@@ -201,35 +227,30 @@ class ProjectBuilder:
                 pct = current / total if total > 0 else 0
                 global_progress['callback'](current, total, pct, f"Copying {fits_path.name}")
             
-            try:
-                frame = FitsFile(fits_path)
-                project.add_frame(frame)
-                
-                # Copy FITS file to appropriate subfolder based on frame type
-                if frame.frame_type == 'LIGHT':
-                    dest_folder = project_folder / 'lights'
-                elif frame.frame_type == 'DARK':
-                    dest_folder = project_folder / 'darks'
-                elif frame.frame_type == 'FLAT':
-                    dest_folder = project_folder / 'flats'
-                elif frame.frame_type == 'BIAS':
-                    dest_folder = project_folder / 'biases'
+            project.add_frame(frame)
+            
+            # Copy FITS file to appropriate subfolder based on frame type
+            if frame.frame_type == 'LIGHT':
+                dest_folder = project_folder / 'lights'
+            elif frame.frame_type == 'DARK':
+                dest_folder = project_folder / 'darks'
+            elif frame.frame_type == 'FLAT':
+                dest_folder = project_folder / 'flats'
+            elif frame.frame_type == 'BIAS':
+                dest_folder = project_folder / 'biases'
+            else:
+                # UNKNOWN or other types go to lights
+                dest_folder = project_folder / 'lights'
+            
+            dest_file = dest_folder / fits_path.name
+            
+            if dest_folder.exists():
+                # Skip if file already exists
+                if dest_file.exists():
+                    logger.info(f"Skipping existing file: {fits_path.name}")
                 else:
-                    # UNKNOWN or other types go to lights
-                    dest_folder = project_folder / 'lights'
-                
-                dest_file = dest_folder / fits_path.name
-                
-                if dest_folder.exists():
-                    # Skip if file already exists
-                    if dest_file.exists():
-                        logger.info(f"Skipping existing file: {fits_path.name}")
-                    else:
-                        copy2(fits_path, dest_file)
-                        logger.info(f"Copied: {fits_path.name} to {dest_folder.name}")
-                    
-            except Exception as e:
-                logger.warning(f"Failed to process {fits_path}: {e}")
+                    copy2(fits_path, dest_file)
+                    logger.info(f"Copied: {fits_path.name} to {dest_folder.name}")
         
         self.projects.append(project)
         return project

@@ -10,6 +10,7 @@ from pathlib import Path
 import threading
 import logging
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 # Import core business logic
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
@@ -54,6 +55,9 @@ class SeestarApp(ctk.CTk):
         
         self.setup_ui()
         
+        # Load saved directories and auto-populate UI
+        self._load_saved_directories()
+        
         # Set fullscreen/maximized window state
         self.state('zoomed')  # Windows maximized
         # Alternative: self.attributes('-fullscreen', True) for true fullscreen
@@ -64,6 +68,37 @@ class SeestarApp(ctk.CTk):
     def show_disclaimer(self):
         """Show the disclaimer window."""
         DisclaimerWindow(self, self.settings)
+    
+    def _load_saved_directories(self):
+        """Load saved directories from settings and auto-populate UI labels."""
+        # Load Seestar directory
+        seestar_dir = self.settings.get_seestar_dir()
+        if seestar_dir and Path(seestar_dir).exists():
+            self.seestar_dir = Path(seestar_dir)
+            if hasattr(self, 'seestar_path_label'):
+                self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
+            logger.info(f"Loaded saved Seestar directory: {self.seestar_dir}")
+        
+        # Load Raw directory
+        raw_dir = self.settings.get_raw_dir()
+        if raw_dir and Path(raw_dir).exists():
+            self.raw_dir = Path(raw_dir)
+            if hasattr(self, 'raw_path_label'):
+                self.raw_path_label.configure(text=str(self.raw_dir), text_color="white")
+            logger.info(f"Loaded saved Raw directory: {self.raw_dir}")
+        
+        # Load Projects directory
+        projects_dir = self.settings.get_projects_dir()
+        if projects_dir and Path(projects_dir).exists():
+            self.projects_dir = Path(projects_dir)
+            if hasattr(self, 'projects_path_label'):
+                self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
+            logger.info(f"Loaded saved Projects directory: {self.projects_dir}")
+            
+            # Also load into analyze_projects_dir for reuse
+            self.analyze_projects_dir = Path(projects_dir)
+            if hasattr(self, 'analyze_projects_path_label'):
+                self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
     
     def _create_menu_item(self, parent, text, font, command):
         """Create a traditional menu item button.
@@ -362,6 +397,8 @@ class SeestarApp(ctk.CTk):
             self.seestar_dir = Path(directory)
             self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
             logger.info(f"Selected Seestar directory: {self.seestar_dir}")
+            # Save to settings
+            self.settings.set_seestar_dir(directory)
     
     def select_raw_dir(self):
         """Select raw directory (target for copy)."""
@@ -370,6 +407,8 @@ class SeestarApp(ctk.CTk):
             self.raw_dir = Path(directory)
             self.raw_path_label.configure(text=str(self.raw_dir), text_color="white")
             logger.info(f"Selected raw directory: {self.raw_dir}")
+            # Save to settings
+            self.settings.set_raw_dir(directory)
     
     def select_projects_dir(self):
         """Select projects directory."""
@@ -378,6 +417,8 @@ class SeestarApp(ctk.CTk):
             self.projects_dir = Path(directory)
             self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
             logger.info(f"Selected projects directory: {self.projects_dir}")
+            # Save to settings
+            self.settings.set_projects_dir(directory)
     
     def select_analyze_projects_dir(self):
         """Select projects directory for analysis."""
@@ -386,6 +427,8 @@ class SeestarApp(ctk.CTk):
             self.analyze_projects_dir = Path(directory)
             self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
             logger.info(f"Selected analyze projects directory: {self.analyze_projects_dir}")
+            # Also save to projects_dir setting for reuse
+            self.settings.set_projects_dir(directory)
     
     def select_ps_source_dir(self):
         """Select Seestar MyWorks directory for Planetary & Scenery copy."""
@@ -633,6 +676,22 @@ class SeestarApp(ctk.CTk):
         if selected_file_types:
             logger.info(f"Filtering by file types: {selected_file_types}")
         
+        def copy_single_file(fits_file, raw_folder):
+            """Copy a single file and return (copied, skipped) status."""
+            dest_file = raw_folder / fits_file.name
+            
+            if dest_file.exists():
+                # Compare file sizes
+                src_size = fits_file.stat().st_size
+                dest_size = dest_file.stat().st_size
+                
+                if src_size == dest_size:
+                    return (0, 1)  # skipped
+            
+            # Copy the file
+            shutil.copy2(fits_file, dest_file)
+            return (1, 0)  # copied
+        
         for folder in folders:
             # Create corresponding folder in Raw
             raw_folder = self.raw_dir / folder.name
@@ -651,21 +710,16 @@ class SeestarApp(ctk.CTk):
             files_copied = 0
             files_skipped = 0
             
-            for fits_file in files_to_copy:
-                dest_file = raw_folder / fits_file.name
+            # Use ThreadPoolExecutor for parallel copying
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = []
+                for fits_file in files_to_copy:
+                    futures.append(executor.submit(copy_single_file, fits_file, raw_folder))
                 
-                if dest_file.exists():
-                    # Compare file sizes
-                    src_size = fits_file.stat().st_size
-                    dest_size = dest_file.stat().st_size
-                    
-                    if src_size == dest_size:
-                        files_skipped += 1
-                        continue
-                
-                # Copy the file
-                shutil.copy2(fits_file, dest_file)
-                files_copied += 1
+                for future in futures:
+                    copied, skipped = future.result()
+                    files_copied += copied
+                    files_skipped += skipped
             
             logger.info(f"Folder {folder.name}: {files_copied} files copied, {files_skipped} files skipped")
     
@@ -717,6 +771,18 @@ class SeestarApp(ctk.CTk):
             copied_files = 0
             skipped_files = 0
             
+            def copy_single_media_file(item, target_folder):
+                """Copy a single media file and return (copied, skipped) status."""
+                dest_file = target_folder / item.name
+                
+                if dest_file.exists():
+                    # Compare sizes
+                    if item.stat().st_size == dest_file.stat().st_size:
+                        return (0, 1)  # skipped
+                
+                shutil.copy2(item, dest_file)
+                return (1, 0)  # copied
+            
             for folder_name in media_folders:
                 source_folder = self.ps_source_dir / folder_name
                 if not source_folder.exists():
@@ -726,20 +792,24 @@ class SeestarApp(ctk.CTk):
                 target_folder = self.ps_target_dir / folder_name
                 target_folder.mkdir(parents=True, exist_ok=True)
                 
-                # Copy all files (images and videos)
+                # Collect all files
+                files_to_copy = []
                 for item in source_folder.iterdir():
                     if item.is_file():
-                        total_files += 1
-                        dest_file = target_folder / item.name
-                        
-                        if dest_file.exists():
-                            # Compare sizes
-                            if item.stat().st_size == dest_file.stat().st_size:
-                                skipped_files += 1
-                                continue
-                        
-                        shutil.copy2(item, dest_file)
-                        copied_files += 1
+                        files_to_copy.append(item)
+                
+                total_files += len(files_to_copy)
+                
+                # Use ThreadPoolExecutor for parallel copying
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    futures = []
+                    for item in files_to_copy:
+                        futures.append(executor.submit(copy_single_media_file, item, target_folder))
+                    
+                    for future in futures:
+                        copied, skipped = future.result()
+                        copied_files += copied
+                        skipped_files += skipped
                 
                 self.after(0, lambda f=folder_name, c=copied_files, s=skipped_files: 
                     self.progress_label.configure(

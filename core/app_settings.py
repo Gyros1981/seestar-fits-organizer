@@ -34,6 +34,9 @@ class AppSettings:
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
             'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
+            'seestar_dir': None,  # Most recently used Seestar directory
+            'raw_dir': None,  # Most recently used Raw directory
+            'projects_dir': None,  # Most recently used Projects directory
         }
         
         self._load_settings()
@@ -158,6 +161,48 @@ class AppSettings:
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
             'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
+            'seestar_dir': None,  # Most recently used Seestar directory
+            'raw_dir': None,  # Most recently used Raw directory
+            'projects_dir': None,  # Most recently used Projects directory
         }
         self._save_settings()
         logger.info("Settings reset to defaults")
+    
+    def get_seestar_dir(self) -> Optional[str]:
+        """Get the most recently used Seestar directory."""
+        return self.settings.get('seestar_dir')
+    
+    def set_seestar_dir(self, directory: Optional[str]):
+        """Set the most recently used Seestar directory.
+        
+        Args:
+            directory: Directory path or None
+        """
+        self.settings['seestar_dir'] = directory
+        self._save_settings()
+    
+    def get_raw_dir(self) -> Optional[str]:
+        """Get the most recently used Raw directory."""
+        return self.settings.get('raw_dir')
+    
+    def set_raw_dir(self, directory: Optional[str]):
+        """Set the most recently used Raw directory.
+        
+        Args:
+            directory: Directory path or None
+        """
+        self.settings['raw_dir'] = directory
+        self._save_settings()
+    
+    def get_projects_dir(self) -> Optional[str]:
+        """Get the most recently used Projects directory."""
+        return self.settings.get('projects_dir')
+    
+    def set_projects_dir(self, directory: Optional[str]):
+        """Set the most recently used Projects directory.
+        
+        Args:
+            directory: Directory path or None
+        """
+        self.settings['projects_dir'] = directory
+        self._save_settings()

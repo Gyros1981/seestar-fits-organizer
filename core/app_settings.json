@@ -3,5 +3,8 @@
   "timezone": "PST",
   "disclaimer_acknowledged": true,
   "coordinate_format": "degrees",
-  "text_scale": 1.0
+  "text_scale": 1.0,
+  "seestar_dir": "C:/Users/Guy/Desktop/Astrophotography/Images",
+  "raw_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Raw",
+  "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Projects"
 }
