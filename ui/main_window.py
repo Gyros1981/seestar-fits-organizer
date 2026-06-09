@@ -286,11 +286,28 @@ class SeestarApp(ctk.CTk):
         self.left_panel = ctk.CTkFrame(self.content_frame)
         self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 0))
         
-        # Resizable separator
-        self.separator = ctk.CTkFrame(self.content_frame, width=6, fg_color="#3a3a3a", cursor="sb_h_double_arrow")
+        # Resizable separator with toggle button
+        self.separator = ctk.CTkFrame(self.content_frame, width=12, fg_color="#3a3a3a", cursor="sb_h_double_arrow")
         self.separator.grid(row=0, column=1, sticky="ns")
         
-        # Bind mouse events for dragging
+        # Console toggle button on separator
+        self.console_toggle_btn = ctk.CTkButton(
+            self.separator,
+            text="▶",
+            width=24,
+            height=36,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#3a3a3a",
+            hover_color="#555555",
+            text_color="white",
+            command=self.toggle_console
+        )
+        self.console_toggle_btn.place(relx=0.5, rely=0.5, anchor="center")
+        
+        # Console state
+        self.console_visible = True
+        
+        # Bind mouse events for dragging (on separator, not button)
         self.separator.bind("<Button-1>", self._start_resize)
         self.separator.bind("<B1-Motion>", self._on_resize)
         self.separator.bind("<ButtonRelease-1>", self._end_resize)
@@ -1816,9 +1833,13 @@ class SeestarApp(ctk.CTk):
             # Hide normal mode panels, show settings in left panel only
             self.left_panel.grid_forget()
             self.fits_viewer_frame.grid_forget()
-            # Keep separator and right_panel (console) visible
+            # Keep separator visible
             self.separator.grid(row=0, column=1, sticky="ns")
-            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            # Show/hide console based on state
+            if self.console_visible:
+                self.right_panel.grid(row=0, column=2, sticky="nsew")
+            else:
+                self.right_panel.grid_forget()
             self.settings_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=10)
             self.progress_label.configure(text="Settings mode - configure app settings and click Save")
             
@@ -1831,18 +1852,28 @@ class SeestarApp(ctk.CTk):
             # Hide normal mode panels, show fits viewer in left panel only
             self.left_panel.grid_forget()
             self.settings_frame.grid_forget()
-            # Keep separator and right_panel (console) visible
+            # Keep separator visible
             self.separator.grid(row=0, column=1, sticky="ns")
-            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            # Show/hide console based on state
+            if self.console_visible:
+                self.right_panel.grid(row=0, column=2, sticky="nsew")
+            else:
+                self.right_panel.grid_forget()
             self.fits_viewer_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
             self.progress_label.configure(text="FITS Viewer - browse and preview FITS files")
         else:
             # Hide settings and fits viewer, show normal layout
             self.settings_frame.grid_forget()
             self.fits_viewer_frame.grid_forget()
-            # Ensure separator and right_panel are visible
+            # Ensure separator is visible
             self.separator.grid(row=0, column=1, sticky="ns")
-            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            # Show/hide console based on state
+            if self.console_visible:
+                self.right_panel.grid(row=0, column=2, sticky="nsew")
+                self.content_frame.grid_columnconfigure(2, weight=1)
+            else:
+                self.right_panel.grid_forget()
+                self.content_frame.grid_columnconfigure(2, weight=0)
             self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
             
             # Hide all content frames in left panel
@@ -1953,6 +1984,23 @@ class SeestarApp(ctk.CTk):
     def _end_resize(self, event):
         """End resizing when mouse button is released."""
         self._resizing = False
+    
+    def toggle_console(self):
+        """Toggle the visibility of the console panel."""
+        if self.console_visible:
+            # Hide console
+            self.right_panel.grid_forget()
+            self.content_frame.grid_columnconfigure(2, weight=0)
+            self.console_toggle_btn.configure(text="◀")
+            self.console_visible = False
+            logger.info("Console collapsed")
+        else:
+            # Show console
+            self.right_panel.grid(row=0, column=2, sticky="nsew")
+            self.content_frame.grid_columnconfigure(2, weight=1)
+            self.console_toggle_btn.configure(text="▶")
+            self.console_visible = True
+            logger.info("Console expanded")
     
     def _show_folder_selection_dialog(self, folders: list) -> list:
         """Show folder selection dialog and return selected folders.
