@@ -130,7 +130,7 @@ class ProjectAnalyzer:
     def __init__(self, projects_dir: Path):
         self.projects_dir = projects_dir
     
-    def analyze_all(self, progress_callback=None) -> AggregateAnalysis:
+    def analyze_all(self, progress_callback=None, specific_folders=None) -> AggregateAnalysis:
         """Analyze all projects in the projects directory.
         
         First tries to find _Project folders. If none found, falls back to
@@ -138,46 +138,54 @@ class ProjectAnalyzer:
         
         Args:
             progress_callback: Optional callback function(current, total, percentage, message)
+            specific_folders: Optional list of specific folders to analyze. If provided, 
+                           only these folders will be analyzed instead of scanning the directory.
         """
         aggregate = AggregateAnalysis()
         
-        logger.info(f"Analyzing projects directory: {self.projects_dir}")
-        
-        # First: Look for _Project folders
-        project_folders = []
-        for item in self.projects_dir.iterdir():
-            if item.is_dir() and item.name.endswith('_Project'):
-                project_folders.append(item)
-        
-        if project_folders:
-            logger.info(f"Found {len(project_folders)} _Project folders to analyze")
+        if specific_folders:
+            # Use the provided specific folders
+            project_folders = specific_folders
+            logger.info(f"Analyzing {len(project_folders)} specific folders")
         else:
-            # Fallback: Look for any directory with FITS files (one level only)
-            logger.info("No _Project folders found, scanning for directories with FITS files...")
-            project_folders = set()
+            # Scan for project folders
+            logger.info(f"Analyzing projects directory: {self.projects_dir}")
             
+            # First: Look for _Project folders
+            project_folders = []
             for item in self.projects_dir.iterdir():
-                if item.is_dir():
-                    # Check if this folder contains FITS files (not recursive, one level only)
-                    has_fits = False
-                    for file in item.iterdir():
-                        if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
-                            has_fits = True
-                            break
-                        # Also check subfolders like lights/, darks/, etc.
-                        if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
-                            for subfile in file.iterdir():
-                                if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
-                                    has_fits = True
-                                    break
-                            if has_fits:
-                                break
-                    
-                    if has_fits:
-                        project_folders.add(item)
+                if item.is_dir() and item.name.endswith('_Project'):
+                    project_folders.append(item)
             
-            project_folders = sorted(project_folders)
-            logger.info(f"Found {len(project_folders)} directories with FITS files to analyze")
+            if project_folders:
+                logger.info(f"Found {len(project_folders)} _Project folders to analyze")
+            else:
+                # Fallback: Look for any directory with FITS files (one level only)
+                logger.info("No _Project folders found, scanning for directories with FITS files...")
+                project_folders = set()
+                
+                for item in self.projects_dir.iterdir():
+                    if item.is_dir():
+                        # Check if this folder contains FITS files (not recursive, one level only)
+                        has_fits = False
+                        for file in item.iterdir():
+                            if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
+                                has_fits = True
+                                break
+                            # Also check subfolders like lights/, darks/, etc.
+                            if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                                for subfile in file.iterdir():
+                                    if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
+                                        has_fits = True
+                                        break
+                                if has_fits:
+                                    break
+                        
+                        if has_fits:
+                            project_folders.add(item)
+                
+                project_folders = sorted(project_folders)
+                logger.info(f"Found {len(project_folders)} directories with FITS files to analyze")
         
         if not project_folders:
             logger.warning(f"No project folders found in {self.projects_dir}")

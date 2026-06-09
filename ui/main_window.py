@@ -743,6 +743,44 @@ class SeestarApp(ctk.CTk):
     def analyze_projects(self):
         """Analyze existing projects and show results."""
         try:
+            # Scan for project folders
+            project_folders = []
+            for item in self.analyze_projects_dir.iterdir():
+                if item.is_dir() and item.name.endswith('_Project'):
+                    project_folders.append(item)
+            
+            # Fallback: Look for any directory with FITS files
+            if not project_folders:
+                logger.info("No _Project folders found, scanning for directories with FITS files...")
+                for item in self.analyze_projects_dir.iterdir():
+                    if item.is_dir():
+                        has_fits = False
+                        for file in item.iterdir():
+                            if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
+                                has_fits = True
+                                break
+                            if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                                for subfile in file.iterdir():
+                                    if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
+                                        has_fits = True
+                                        break
+                                if has_fits:
+                                    break
+                        if has_fits:
+                            project_folders.append(item)
+            
+            if not project_folders:
+                self.after(0, lambda: messagebox.showinfo("No Projects", "No project folders found in the selected directory."))
+                return
+            
+            # Show folder selection dialog
+            selected_folders = self._show_folder_selection_dialog(project_folders)
+            
+            if not selected_folders:
+                self.after(0, lambda: self.progress_label.configure(text="Analysis cancelled."))
+                self.after(0, lambda: self.set_ui_state(True))
+                return
+            
             analyzer = ProjectAnalyzer(self.analyze_projects_dir)
             
             # Set up progress callback
@@ -750,7 +788,7 @@ class SeestarApp(ctk.CTk):
                 self.after(0, lambda: self.progress_bar.set(percentage))
                 self.after(0, lambda: self.progress_label.configure(text=f"{message} ({current}/{total})"))
             
-            results = analyzer.analyze_all(progress_callback=progress_callback)
+            results = analyzer.analyze_all(progress_callback=progress_callback, specific_folders=selected_folders)
             
             # Update UI on main thread
             self.after(0, lambda: self.progress_bar.set(1.0))  # Complete progress bar
