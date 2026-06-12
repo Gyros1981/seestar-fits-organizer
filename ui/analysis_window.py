@@ -162,6 +162,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         # Prompt for save location
         file_path = filedialog.asksaveasfilename(
             title="Export Analysis to CSV",
+            initialdir=str(Path.home()),
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
             initialfile=f"seestar_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
