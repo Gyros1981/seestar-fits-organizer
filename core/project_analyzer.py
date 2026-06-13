@@ -254,6 +254,7 @@ class ProjectAnalyzer:
                         analysis.flats += 1
                     elif frame_type == 'BIAS':
                         analysis.bias += 1
+                        logger.warning(f"BIAS frame detected: {fits_path} | IMAGETYP={metadata.imagetyp!r} | EXPTIME={metadata.exptime}")
                     
                     # Capture site location from first frame
                     if analysis.site is None and metadata.site:

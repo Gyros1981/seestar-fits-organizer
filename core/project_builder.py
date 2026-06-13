@@ -163,7 +163,12 @@ class ProjectBuilder:
         # Extract project name from folder name
         # m3_subs or m3_sub -> M3_Project
         folder_name = source_folder.name
-        object_name = folder_name.replace('_subs', '').replace('_sub', '').title()
+        object_name = folder_name.replace('_subs', '').replace('_sub', '').replace('_', ' ').title()
+        # Uppercase common catalog prefixes that .title() gets wrong (e.g. Ngc -> NGC, Ic -> IC)
+        for prefix in ('Ngc', 'Ic', 'Ugc', 'Pgc', 'Mcg', 'Arp'):
+            if object_name.upper().startswith(prefix.upper()):
+                object_name = prefix.upper() + object_name[len(prefix):]
+                break
         project_name = f"{object_name}_Project"
         
         # Create project folder

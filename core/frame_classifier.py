@@ -50,7 +50,8 @@ class FrameClassifier:
         # Very short exposures (<= 0.01 sec) are typically BIAS
         # Short exposures (0.01 - 5 sec) are typically FLATS
         # Longer exposures are typically LIGHT or DARK
-        if metadata.exptime is not None:
+        # Negative or zero exposure times indicate processed/stacked files - skip heuristics
+        if metadata.exptime is not None and metadata.exptime > 0:
             if metadata.exptime <= 0.01:
                 return 'BIAS'
             elif metadata.exptime <= 5.0:
