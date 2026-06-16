@@ -13,10 +13,442 @@ import subprocess
 import platform
 import webbrowser
 import logging
+import json
+import os
 from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
 from .preview_window import PreviewWindow
 
+# SIMBAD TAP service endpoint
+SIMBAD_TAP_URL = "http://simbad.u-strasbg.fr/simbad/sim-tap/sync"
+
+# Cache file for common names lookup
+COMMON_NAMES_CACHE_FILE = Path.home() / '.seestar_fits_organizer' / 'common_names_cache.json'
+
+
+def load_common_names_cache():
+    """Load cached common names from file."""
+    if COMMON_NAMES_CACHE_FILE.exists():
+        try:
+            with open(COMMON_NAMES_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_common_names_cache(cache):
+    """Save common names cache to file."""
+    try:
+        COMMON_NAMES_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(COMMON_NAMES_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"Could not save common names cache: {e}")
+
+
+def query_simbad_batch(object_names):
+    """
+    Query SIMBAD script service for common names of multiple objects.
+    
+    Uses the SIMBAD script service to get all identifiers, then extracts
+    common names (those starting with 'NAME ').
+    
+    Args:
+        object_names: List of object names to query (e.g., ['M51', 'NGC6960'])
+        
+    Returns:
+        Dict mapping normalized object names to common names
+    """
+    if not object_names:
+        return {}
+    
+    results = {}
+    
+    # Format object names for SIMBAD (add spaces after M/NGC/IC if needed)
+    formatted_names = []
+    for name in object_names:
+        name_upper = name.upper()
+        # Format: M51 -> 'M 51', NGC6960 -> 'NGC 6960'
+        if name_upper.startswith('M') and len(name_upper) > 1 and name_upper[1:].isdigit():
+            formatted_names.append(f"M {name_upper[1:]}")
+        elif name_upper.startswith('NGC') and len(name_upper) > 3 and name_upper[3:].isdigit():
+            formatted_names.append(f"NGC {name_upper[3:]}")
+        elif name_upper.startswith('IC') and len(name_upper) > 2 and name_upper[2:].isdigit():
+            formatted_names.append(f"IC {name_upper[2:]}")
+        else:
+            formatted_names.append(name_upper)
+    
+    # Query each object using SIMBAD script service
+    # Note: We could do a batch query but individual queries are more reliable
+    for obj_name in formatted_names:
+        try:
+            # SIMBAD script to get all identifiers
+            script = f'format object "%IDLIST"\nquery id {obj_name}'
+            encoded_script = quote(script, safe='')
+            url = f"http://simbad.u-strasbg.fr/simbad/sim-script?script={encoded_script}"
+            
+            req = Request(url, headers={'User-Agent': 'SeestarFITSOrganizer/1.0'})
+            
+            with urlopen(req, timeout=30) as response:
+                content = response.read().decode('utf-8')
+            
+            # Extract the data section
+            if '::data::' in content:
+                data_section = content.split('::data::')[1].strip()
+                
+                # Look for common names (identifiers starting with 'NAME ')
+                common_names = []
+                for line in data_section.split('\n'):
+                    line = line.strip()
+                    if line.startswith('NAME '):
+                        # Extract the name after 'NAME '
+                        common_name = line[5:].strip()
+                        if common_name:
+                            common_names.append(common_name)
+                
+                # Use the first common name found (usually the main one)
+                if common_names:
+                    # Normalize the object name for the key
+                    normalized = obj_name.upper().replace(' ', '').replace('-', '')
+                    results[normalized] = common_names[0]
+                    logger.debug(f"Found common name for {obj_name}: {common_names[0]}")
+            
+        except Exception as e:
+            logger.debug(f"Failed to query SIMBAD for {obj_name}: {e}")
+            continue
+    
+    if results:
+        logger.info(f"Retrieved {len(results)} common names from SIMBAD")
+    
+    return results
+
 logger = logging.getLogger(__name__)
+
+
+# Common names lookup for astronomical objects
+# Maps catalog identifiers to common names
+OBJECT_COMMON_NAMES = {
+    # Messier objects
+    'M1': 'Crab Nebula',
+    'M2': None,
+    'M3': None,
+    'M4': None,
+    'M5': None,
+    'M6': 'Butterfly Cluster',
+    'M7': 'Ptolemy Cluster',
+    'M8': 'Lagoon Nebula',
+    'M9': None,
+    'M10': None,
+    'M11': 'Wild Duck Cluster',
+    'M12': None,
+    'M13': 'Hercules Globular Cluster',
+    'M14': None,
+    'M15': None,
+    'M16': 'Eagle Nebula',
+    'M17': 'Omega Nebula',
+    'M18': None,
+    'M19': None,
+    'M20': 'Trifid Nebula',
+    'M21': None,
+    'M22': None,
+    'M23': None,
+    'M24': 'Sagittarius Star Cloud',
+    'M25': None,
+    'M26': None,
+    'M27': 'Dumbbell Nebula',
+    'M28': None,
+    'M29': None,
+    'M30': None,
+    'M31': 'Andromeda Galaxy',
+    'M32': None,
+    'M33': 'Triangulum Galaxy',
+    'M34': None,
+    'M35': None,
+    'M36': 'Pinwheel Cluster',
+    'M37': None,
+    'M38': 'Starfish Cluster',
+    'M39': None,
+    'M40': None,
+    'M41': None,
+    'M42': 'Orion Nebula',
+    'M43': None,
+    'M44': 'Beehive Cluster',
+    'M45': 'Pleiades',
+    'M46': None,
+    'M47': None,
+    'M48': None,
+    'M49': None,
+    'M50': 'Heart-Shaped Cluster',
+    'M51': 'Whirlpool Galaxy',
+    'M52': None,
+    'M53': None,
+    'M54': None,
+    'M55': None,
+    'M56': None,
+    'M57': 'Ring Nebula',
+    'M58': None,
+    'M59': None,
+    'M60': None,
+    'M61': None,
+    'M62': None,
+    'M63': 'Sunflower Galaxy',
+    'M64': 'Black Eye Galaxy',
+    'M65': 'Leo Triplet',
+    'M66': 'Leo Triplet',
+    'M67': None,
+    'M68': None,
+    'M69': None,
+    'M70': None,
+    'M71': None,
+    'M72': None,
+    'M73': None,
+    'M74': 'Phantom Galaxy',
+    'M75': None,
+    'M76': 'Little Dumbbell Nebula',
+    'M77': None,
+    'M78': None,
+    'M79': None,
+    'M80': None,
+    'M81': 'Bode\'s Galaxy',
+    'M82': 'Cigar Galaxy',
+    'M83': 'Southern Pinwheel Galaxy',
+    'M84': None,
+    'M85': None,
+    'M86': None,
+    'M87': 'Virgo A',
+    'M88': None,
+    'M89': None,
+    'M90': None,
+    'M91': None,
+    'M92': None,
+    'M93': None,
+    'M94': 'Cat\'s Eye Galaxy',
+    'M95': None,
+    'M96': None,
+    'M97': 'Owl Nebula',
+    'M98': None,
+    'M99': None,
+    'M100': None,
+    'M101': 'Pinwheel Galaxy',
+    'M102': None,
+    'M103': None,
+    'M104': 'Sombrero Galaxy',
+    'M105': None,
+    'M106': None,
+    'M107': None,
+    'M108': None,
+    'M109': None,
+    'M110': None,
+    # NGC objects (selected popular ones)
+    'NGC6960': 'Western Veil Nebula',
+    'NGC6992': 'Eastern Veil Nebula',
+    'NGC6995': 'Eastern Veil Nebula',
+    'NGC6974': None,
+    'NGC6979': None,
+    'NGC2024': 'Flame Nebula',
+    'NGC2264': 'Christmas Tree Cluster',
+    'NGC2237': 'Rosette Nebula',
+    'NGC2238': 'Rosette Nebula',
+    'NGC2239': 'Rosette Nebula',
+    'NGC2244': 'Rosette Nebula',
+    'NGC2246': 'Rosette Nebula',
+    'NGC7000': 'North America Nebula',
+    'NGC1976': 'Orion Nebula',
+    'NGC6514': 'Trifid Nebula',
+    'NGC6523': 'Trifid Nebula',
+    'NGC6611': 'Eagle Nebula',
+    'NGC6720': 'Ring Nebula',
+    'NGC1952': 'Crab Nebula',
+    'NGC7293': 'Helix Nebula',
+    'NGC3372': 'Eta Carinae Nebula',
+    'NGC2261': 'Hubble\'s Variable Nebula',
+    'NGC2392': 'Eskimo Nebula',
+    'NGC3587': 'Owl Nebula',
+    'NGC6853': 'Dumbbell Nebula',
+    'NGC6503': 'Little Dumbbell Nebula',
+    'NGC1982': 'M43',
+    'NGC2070': 'Tarantula Nebula',
+    'NGC7635': 'Bubble Nebula',
+    'NGC1499': 'California Nebula',
+    'NGC1435': 'Merope Nebula',
+    'NGC6857': None,
+    'NGC7662': 'Blue Snowball',
+    'NGC6210': None,
+    'NGC891': None,
+    'NGC457': 'Owl Cluster',
+    'NGC663': None,
+    'NGC869': 'Double Cluster',
+    'NGC884': 'Double Cluster',
+    'NGC6383': None,
+    'NGC6397': None,
+    'NGC6541': None,
+    'NGC6752': None,
+    'NGC362': None,
+    'NGC104': '47 Tucanae',
+    'NGC2071': None,
+    'NGC5139': 'Omega Centauri',
+    'NGC5904': None,
+    'NGC6205': 'Hercules Globular Cluster',
+    'NGC6341': None,
+    'NGC7078': None,
+    'NGC7099': None,
+    'NGC205': None,
+    'NGC221': None,
+    'NGC224': 'Andromeda Galaxy',
+    'NGC598': 'Triangulum Galaxy',
+    'NGC3031': 'Bode\'s Galaxy',
+    'NGC3034': 'Cigar Galaxy',
+    'NGC4594': 'Sombrero Galaxy',
+    'NGC5457': 'Pinwheel Galaxy',
+    'NGC5194': 'Whirlpool Galaxy',
+    'NGC5195': None,
+    'NGC6543': 'Cat\'s Eye Nebula',
+    'IC434': 'Horsehead Nebula',
+    'IC4603': 'Rho Ophiuchi',
+    'IC4604': 'Rho Ophiuchi',
+    'IC4605': 'Rho Ophiuchi',
+    'IC1318': 'Gamma Cygni Nebula',
+    'IC1805': 'Heart Nebula',
+    'IC1848': 'Soul Nebula',
+    'IC405': 'Flaming Star Nebula',
+    'IC2177': 'Seagull Nebula',
+    'IC1396': 'Elephant Trunk Nebula',
+    'IC5070': 'Pelican Nebula',
+    'IC5067': 'Pelican Nebula',
+    'IC5146': 'Cocoon Nebula',
+    # Popular star/asterism names
+    'ALNILAM': None,
+    'ALNITAK': None,
+    'MINTAKA': None,
+    'BETELGEUSE': None,
+    'RIGEL': None,
+    'ALDEBARAN': None,
+    'CAPPELLA': None,
+    'SIRIUS': None,
+    'VEGA': None,
+    'ALTAIR': None,
+    'DENEB': None,
+    'POLARIS': 'North Star',
+    'ANTARES': None,
+    'SPICA': None,
+    'REGULUS': None,
+    'ARCTURUS': None,
+    'ALPHARD': None,
+}
+
+
+# Global cache for common names (populated at export time)
+_common_names_cache = {}
+_common_names_cache_loaded = False
+
+
+def _ensure_cache_loaded():
+    """Ensure the common names cache is loaded."""
+    global _common_names_cache, _common_names_cache_loaded
+    if not _common_names_cache_loaded:
+        _common_names_cache = load_common_names_cache()
+        # Merge with built-in dictionary
+        for key, value in OBJECT_COMMON_NAMES.items():
+            if value and key not in _common_names_cache:
+                _common_names_cache[key] = value
+        _common_names_cache_loaded = True
+
+
+def get_common_name(object_name: str) -> str:
+    """Get the common name for an astronomical object.
+    
+    Uses local cache first, which is populated from SIMBAD API
+    during CSV export for all unknown objects in one batch.
+    
+    Args:
+        object_name: The catalog name (e.g., 'NGC6960', 'M51', 'M42')
+        
+    Returns:
+        The common name if known, otherwise empty string
+    """
+    if not object_name:
+        return ''
+    
+    # Normalize the object name (remove spaces, uppercase)
+    normalized = object_name.upper().replace(' ', '').replace('-', '')
+    
+    # Ensure cache is loaded
+    _ensure_cache_loaded()
+    
+    # Check cache first
+    if normalized in _common_names_cache:
+        name = _common_names_cache[normalized]
+        return name if name else ''
+    
+    # Try with IC prefix variations
+    if normalized.startswith('IC'):
+        base = normalized[2:]
+        try:
+            num = int(base)
+            ic_key = f"IC{num}"
+            if ic_key in _common_names_cache:
+                name = _common_names_cache[ic_key]
+                return name if name else ''
+        except ValueError:
+            pass
+    
+    # Try with NGC prefix variations
+    if normalized.startswith('NGC'):
+        base = normalized[3:]
+        try:
+            num = int(base)
+            ngc_key = f"NGC{num}"
+            if ngc_key in _common_names_cache:
+                name = _common_names_cache[ngc_key]
+                return name if name else ''
+        except ValueError:
+            pass
+    
+    return ''
+
+
+def lookup_common_names_batch(projects):
+    """
+    Collect all unique objects from projects and query SIMBAD in one batch.
+    
+    This minimizes API calls by doing a single batch query for all unknown objects.
+    Results are cached for future use.
+    
+    Args:
+        projects: List of project dictionaries
+    """
+    global _common_names_cache
+    
+    _ensure_cache_loaded()
+    
+    # Collect all unique objects that aren't in our cache yet
+    unknown_objects = set()
+    for project in projects:
+        objects = project.get('objects', [])
+        for obj in objects:
+            if obj:
+                normalized = obj.upper().replace(' ', '').replace('-', '')
+                if normalized not in _common_names_cache:
+                    unknown_objects.add(obj)
+    
+    if not unknown_objects:
+        logger.info("All object common names found in cache, no API call needed")
+        return
+    
+    logger.info(f"Querying SIMBAD for {len(unknown_objects)} unknown objects...")
+    
+    # Query SIMBAD in batch
+    results = query_simbad_batch(list(unknown_objects))
+    
+    # Update cache with results
+    if results:
+        _common_names_cache.update(results)
+        save_common_names_cache(_common_names_cache)
+        logger.info(f"Cached {len(results)} common names from SIMBAD")
+    else:
+        logger.warning("SIMBAD query returned no results")
 
 
 def _deg_to_hms(ra_deg: float) -> str:
@@ -170,17 +602,37 @@ class AnalysisWindow(ctk.CTkToplevel):
         if not file_path:
             return
         
+        # Query SIMBAD for all unknown objects in one batch before export
+        # This minimizes API calls by doing a single query for all objects
+        lookup_common_names_batch(self.results['projects'])
+        
         try:
             with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
                 
                 # Write project summary section
                 writer.writerow(['PROJECT SUMMARY'])
-                writer.writerow(['Project Name', 'Total Lights', 'Total Darks', 'Total Flats', 'Total Bias', 
-                               'Integration Time (hrs)', 'Total Integration (sec)', 'Session Count'])
-                
+
+                # Collect all unique exposure times across all projects for column headers
+                all_project_exposure_times = set()
+                for project in self.results['projects']:
+                    lights_by_exposure = project.get('lights_by_exposure', {})
+                    all_project_exposure_times.update(lights_by_exposure.keys())
+                sorted_project_exposures = sorted(all_project_exposure_times)
+
+                # Build project summary headers with exposure breakdown columns
+                project_base_headers = ['Project Name', 'Common Name (if known)', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
+                               'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count']
+                project_exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_project_exposures]
+                writer.writerow(project_base_headers + project_exposure_headers)
+
                 for project in self.results['projects']:
                     project_name = project.get('name', 'Unknown')
+                    # Get common name from first object in project
+                    objects = project.get('objects', [])
+                    common_name = ''
+                    if objects:
+                        common_name = get_common_name(objects[0])
                     total_lights = project.get('lights', 0)
                     total_darks = project.get('darks', 0)
                     total_flats = project.get('flats', 0)
@@ -188,11 +640,21 @@ class AnalysisWindow(ctk.CTkToplevel):
                     total_integration_sec = project.get('integration_seconds', 0)
                     integration_hrs = total_integration_sec / 3600 if total_integration_sec else 0
                     session_count = len(project.get('sessions', []))
-                    
-                    writer.writerow([
-                        project_name, total_lights, total_darks, total_flats, total_bias,
+
+                    # Build base row
+                    project_base_row = [
+                        project_name, common_name, total_lights, total_darks, total_flats, total_bias,
                         f"{integration_hrs:.2f}", total_integration_sec, session_count
-                    ])
+                    ]
+
+                    # Add exposure counts for each exposure time column at project level
+                    lights_by_exposure = project.get('lights_by_exposure', {})
+                    project_exposure_counts = []
+                    for exp in sorted_project_exposures:
+                        count = lights_by_exposure.get(exp, 0)
+                        project_exposure_counts.append(count)
+
+                    writer.writerow(project_base_row + project_exposure_counts)
                 
                 writer.writerow([])  # Empty row separator
                 
@@ -202,11 +664,25 @@ class AnalysisWindow(ctk.CTkToplevel):
                 coord_format = self.settings.get_coordinate_format()
                 ra_header = 'RA (HMS)' if coord_format == 'hms' else 'RA (deg)'
                 dec_header = 'DEC (DMS)' if coord_format == 'hms' else 'DEC (deg)'
-                writer.writerow(['Project Name', 'Session Start', 'Session End', 'Duration (hrs)',
-                               'Object Name', ra_header, dec_header, 'Constellation',
-                               'Location Name', 'Latitude', 'Longitude',
-                               'Lights', 'Darks', 'Flats', 'Bias',
-                               'Integration Time (hrs)', 'Exposures'])
+
+                # Collect all unique exposure times across all sessions for column headers
+                all_exposure_times = set()
+                for project in self.results['projects']:
+                    for session in project.get('sessions', []):
+                        lights_by_exposure = session[8] if len(session) > 8 else {}
+                        all_exposure_times.update(lights_by_exposure.keys())
+                sorted_exposure_times = sorted(all_exposure_times)
+
+                # Build dynamic headers with parenthetical explanations
+                base_headers = ['Project Name', 'Session Start (Local Time)', 'Session End (Local Time)', 'Session Duration (hrs)',
+                               'Object Name', 'Common Name (if known)', ra_header, dec_header, 'Constellation',
+                               'Shooting Location (Name)', 'Shooting Location (LAT in deg)', 'Shooting Location (LON in deg)',
+                               'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
+                               'Total Integration Time (hrs)']
+
+                # Add exposure breakdown columns
+                exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_exposure_times]
+                writer.writerow(base_headers + exposure_headers)
                 
                 for project in self.results['projects']:
                     project_name = project.get('name', 'Unknown')
@@ -223,7 +699,10 @@ class AnalysisWindow(ctk.CTkToplevel):
                         integration_sec = session[6] if len(session) > 6 else 0
                         exposures = session[7] if len(session) > 7 else []
                         lights_by_exposure = session[8] if len(session) > 8 else {}
-                        
+
+                        # Get common name for this object
+                        obj_common_name = get_common_name(obj_name)
+
                         # Calculate duration
                         duration_hrs = 0
                         if session_start != 'N/A' and session_end != 'N/A':
@@ -233,64 +712,69 @@ class AnalysisWindow(ctk.CTkToplevel):
                                 duration_hrs = (end_dt - start_dt).total_seconds() / 3600
                             except:
                                 pass
-                        
+
                         # Get location from project level
                         lat = project.get('latitude', 'N/A')
                         lon = project.get('longitude', 'N/A')
-                        location_str = f"{lat}, {lon}" if lat != 'N/A' and lon != 'N/A' else 'N/A'
-                        
+
                         # Look up location tag
                         location_name = 'N/A'
                         if lat != 'N/A' and lon != 'N/A':
                             tag = self.location_tags.get_tag(lat, lon)
                             if tag and tag.get('name'):
                                 location_name = tag['name']
-                        
+
                         integration_hrs = integration_sec / 3600 if integration_sec else 0
-                        
-                        # Format exposures
-                        exposure_str = ', '.join([f"{exp}s ({count})" for exp, count in lights_by_exposure.items()])
-                        
+
                         # Format dates
                         if session_start != 'N/A':
                             session_start = self._format_datetime(session_start)
                         if session_end != 'N/A':
                             session_end = self._format_datetime(session_end)
-                        
+
                         # Get coordinate format setting and format RA/DEC values
                         coord_format = self.settings.get_coordinate_format()
                         ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
-                        
+
                         # Get constellation
                         constellation = get_constellation(ra, dec)
-                        
-                        writer.writerow([
+
+                        # Build base row data
+                        base_row = [
                             project_name, session_start, session_end, f"{duration_hrs:.2f}",
-                            obj_name, ra_val, dec_val, constellation,
+                            obj_name, obj_common_name, ra_val, dec_val, constellation,
                             location_name, lat, lon,
                             lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
-                            f"{integration_hrs:.2f}", exposure_str
-                        ])
+                            f"{integration_hrs:.2f}"
+                        ]
+
+                        # Add exposure counts for each exposure time column
+                        exposure_counts = []
+                        for exp in sorted_exposure_times:
+                            count = lights_by_exposure.get(exp, 0)
+                            exposure_counts.append(count)
+
+                        writer.writerow(base_row + exposure_counts)
                 
                 writer.writerow([])  # Empty row separator
                 
                 # Write aggregate statistics
                 writer.writerow(['AGGREGATE STATISTICS'])
-                writer.writerow(['Total Projects', self.results['total_projects']])
-                writer.writerow(['Total Lights', self.results['total_lights']])
-                writer.writerow(['Total Darks', self.results['total_darks']])
-                writer.writerow(['Total Flats', self.results['total_flats']])
-                writer.writerow(['Total Bias', self.results['total_bias']])
-                writer.writerow(['Total Integration (hrs)', f"{self.results['total_integration_hours']:.2f}"])
+                writer.writerow(['Total Projects (count)', self.results['total_projects']])
+                writer.writerow(['Total Lights (count)', self.results['total_lights']])
+                writer.writerow(['Total Darks (count)', self.results['total_darks']])
+                writer.writerow(['Total Flats (count)', self.results['total_flats']])
+                writer.writerow(['Total Bias (count)', self.results['total_bias']])
+                writer.writerow(['Total Integration Time (hrs)', f"{self.results['total_integration_hours']:.2f}"])
                 
                 # Calculate total sessions from project data
                 total_sessions = sum(len(project.get('sessions', [])) for project in self.results['projects'])
-                writer.writerow(['Total Sessions', total_sessions])
+                writer.writerow(['Total Sessions (count)', total_sessions])
                 
                 # Write stored locations section
                 writer.writerow([])  # Empty row separator
                 writer.writerow(['STORED LOCATIONS'])
-                writer.writerow(['Location Name', 'Latitude', 'Longitude', 'Notes'])
+                writer.writerow(['Location Name', 'Latitude (deg)', 'Longitude (deg)', 'Notes'])
                 
                 # Collect all unique locations from location_tags
                 all_tags = []
