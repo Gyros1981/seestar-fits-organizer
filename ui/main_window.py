@@ -1236,18 +1236,18 @@ class SeestarApp(ctk.CTk):
         
         self.sensitivity_slider = ctk.CTkSlider(
             self.sensitivity_frame,
-            from_=0.1,
-            to=1.5,
-            number_of_steps=14,
+            from_=0.2,  # Very Strict
+            to=0.8,     # Lenient (was 1.5 - too wide)
+            number_of_steps=12,  # Finer control
             width=120,
             command=self._on_sensitivity_slide
         )
         self.sensitivity_slider.pack(side="left", padx=5)
-        self.sensitivity_slider.set(0.5)  # Default: Balanced
+        self.sensitivity_slider.set(0.4)  # Default: slightly stricter than balanced
         self._create_tooltip(self.sensitivity_slider, "Drag to adjust detection sensitivity in real-time")
         
         # Store current sensitivity value
-        self.current_sensitivity = 0.5
+        self.current_sensitivity = 0.4  # Default: Mod Strict
         
         self.auto_mark_btn = ctk.CTkButton(
             analysis_frame, 
@@ -1793,18 +1793,18 @@ class SeestarApp(ctk.CTk):
         """Handle real-time slider adjustment."""
         self.current_sensitivity = float(value)
         
-        # Update label based on value
+        # Update label based on value (0.2-0.8 range)
         if value <= 0.25:
             label_text = "Very Strict"
         elif value <= 0.35:
             label_text = "Strict"
         elif value <= 0.45:
             label_text = "Mod Strict"
-        elif value <= 0.6:
+        elif value <= 0.55:
             label_text = "Balanced"
-        elif value <= 0.85:
+        elif value <= 0.65:
             label_text = "Moderate"
-        elif value <= 1.25:
+        elif value <= 0.75:
             label_text = "Lenient"
         else:
             label_text = "Very Lenient"
