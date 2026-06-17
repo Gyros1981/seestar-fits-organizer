@@ -1176,7 +1176,16 @@ class SeestarApp(ctk.CTk):
         self.fits_viewer_dir_label = ctk.CTkLabel(dir_frame, text="No directory selected", text_color="#B0B0B0")
         self.fits_viewer_dir_label.pack(side="left", padx=10, pady=10)
         
-        browse_btn = ctk.CTkButton(dir_frame, text="📁 Browse", command=self.browse_fits_directory, width=100, fg_color="#3498db", hover_color="#2980b9")
+        browse_btn = ctk.CTkButton(
+            dir_frame, 
+            text="Browse", 
+            command=self.browse_fits_directory, 
+            width=100,
+            font=self.get_font(11),
+            text_color="black",
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        )
         browse_btn.pack(side="right", padx=10, pady=10)
         
         # Main content - split view
@@ -1193,78 +1202,112 @@ class SeestarApp(ctk.CTk):
         list_label = ctk.CTkLabel(left_panel, text="FITS Files", font=self.get_font(12, weight="bold"))
         list_label.pack(anchor="w", padx=10, pady=(5, 0))
         
-        # Action buttons frame
-        action_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        action_frame.pack(fill="x", padx=5, pady=5)
+        # Hint label above buttons
+        hint_label = ctk.CTkLabel(left_panel, text="💡 Double-click file to mark/unmark", font=self.get_font(9), text_color="#808080")
+        hint_label.pack(anchor="w", padx=10, pady=(5, 0))
         
-        self.mark_btn = ctk.CTkButton(action_frame, text="✓ Mark", command=self.toggle_mark_selected, width=80, font=self.get_font(11), fg_color="#27ae60", hover_color="#229954")
-        self.mark_btn.pack(side="left", padx=2)
+        # Marked files controls
+        marks_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        marks_frame.pack(fill="x", padx=5, pady=5)
         
-        self.clear_marks_btn = ctk.CTkButton(action_frame, text="⬜ Clear Marks", command=self.clear_all_marks, width=100, font=self.get_font(11), fg_color="#f39c12", hover_color="#e67e22")
+        marks_label = ctk.CTkLabel(marks_frame, text="Marked Files:", font=self.get_font(9), text_color="#A0A0A0")
+        marks_label.pack(side="left", padx=(0, 5))
+        
+        self.clear_marks_btn = ctk.CTkButton(
+            marks_frame, 
+            text="Unmark All", 
+            command=self.clear_all_marks, 
+            width=80, 
+            font=self.get_font(10),
+            text_color="black",
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        )
         self.clear_marks_btn.pack(side="left", padx=2)
         
-        self.delete_marked_btn = ctk.CTkButton(action_frame, text="🗑️ Delete Marked", command=self.delete_marked_fits, width=110, font=self.get_font(11), fg_color="#C0392B", hover_color="#A93226")
-        self.delete_marked_btn.pack(side="right", padx=2)
+        self.delete_marked_btn = ctk.CTkButton(
+            marks_frame, 
+            text="Delete Selected", 
+            command=self.delete_marked_fits, 
+            width=100, 
+            font=self.get_font(10),
+            text_color="white",
+            fg_color="#C0392B",
+            hover_color="#A93226"
+        )
+        self.delete_marked_btn.pack(side="left", padx=8)
         
-        # Analysis button row
+        # Separator line
+        separator = ctk.CTkFrame(left_panel, height=2, fg_color="#555555")
+        separator.pack(fill="x", padx=10, pady=5)
+        
+        # Analysis controls
         analysis_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        analysis_frame.pack(fill="x", padx=5, pady=(0, 5))
+        analysis_frame.pack(fill="x", padx=5, pady=5)
+        
+        analysis_label = ctk.CTkLabel(analysis_frame, text="Analysis:", font=self.get_font(9), text_color="#A0A0A0")
+        analysis_label.pack(anchor="w", padx=2)
+        
+        # Analyze row
+        analyze_row = ctk.CTkFrame(analysis_frame, fg_color="transparent")
+        analyze_row.pack(fill="x", pady=2)
         
         self.analyze_all_btn = ctk.CTkButton(
-            analysis_frame, 
-            text="🔍 Analyze All", 
+            analyze_row, 
+            text="Analyze All", 
             command=self.analyze_all_fits,
-            width=110, 
-            font=self.get_font(11), 
-            fg_color="#8E44AD", 
-            hover_color="#7D3C98"
+            width=90, 
+            font=self.get_font(10),
+            text_color="black",
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.analyze_all_btn.pack(side="left", padx=2)
-        self._create_tooltip(self.analyze_all_btn, "Analyze all images for streaks and star quality")
         
-        # Sensitivity slider with label
-        self.sensitivity_frame = ctk.CTkFrame(analysis_frame, fg_color="transparent")
-        self.sensitivity_frame.pack(side="left", padx=(0, 2), fill="y")
+        self.auto_mark_btn = ctk.CTkButton(
+            analyze_row, 
+            text="Auto-Mark Bad", 
+            command=self.auto_mark_problematic,
+            width=100, 
+            font=self.get_font(10),
+            text_color="black",
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        )
+        self.auto_mark_btn.pack(side="left", padx=8)
+        
+        # Progress label
+        self.analysis_progress_label = ctk.CTkLabel(analyze_row, text="", font=self.get_font(10), text_color="#B0B0B0")
+        self.analysis_progress_label.pack(side="left", padx=5)
+        
+        # Sensitivity row
+        sensi_row = ctk.CTkFrame(analysis_frame, fg_color="transparent")
+        sensi_row.pack(fill="x", pady=(5, 0))
+        
+        sensi_label = ctk.CTkLabel(sensi_row, text="Threshold:", font=self.get_font(9), text_color="#A0A0A0")
+        sensi_label.pack(side="left", padx=2)
         
         self.sensitivity_label = ctk.CTkLabel(
-            self.sensitivity_frame, 
-            text="Strict", 
+            sensi_row, 
+            text="Balanced", 
             font=self.get_font(9),
-            width=50
+            width=60
         )
         self.sensitivity_label.pack(side="left")
         
         self.sensitivity_slider = ctk.CTkSlider(
-            self.sensitivity_frame,
-            from_=0.2,  # Very Strict
-            to=0.8,     # Lenient (was 1.5 - too wide)
-            number_of_steps=12,  # Finer control
-            width=120,
+            sensi_row,
+            from_=0.2,
+            to=0.8,
+            number_of_steps=12,
+            width=140,
             command=self._on_sensitivity_slide
         )
-        self.sensitivity_slider.pack(side="left", padx=5)
-        self.sensitivity_slider.set(0.4)  # Default: slightly stricter than balanced
-        self._create_tooltip(self.sensitivity_slider, "Drag to adjust detection sensitivity in real-time")
+        self.sensitivity_slider.pack(side="left", padx=5, fill="x", expand=True)
+        self.sensitivity_slider.set(0.5)
         
         # Store current sensitivity value
-        self.current_sensitivity = 0.4  # Default: Mod Strict
-        
-        self.auto_mark_btn = ctk.CTkButton(
-            analysis_frame, 
-            text="⚠️ Auto-Mark Bad", 
-            command=self.auto_mark_problematic,
-            width=120, 
-            font=self.get_font(11), 
-            fg_color="#E74C3C", 
-            hover_color="#C0392B"
-        )
-        self.auto_mark_btn.pack(side="left", padx=2)
-        self.auto_mark_btn.configure(state="disabled")  # Enabled after analysis
-        self._create_tooltip(self.auto_mark_btn, "Mark all problematic images for deletion")
-        
-        # Progress label for analysis
-        self.analysis_progress_label = ctk.CTkLabel(analysis_frame, text="", font=self.get_font(10), text_color="#B0B0B0")
-        self.analysis_progress_label.pack(side="right", padx=5)
+        self.current_sensitivity = 0.5
         
         # File list using tk.Listbox for performance
         import tkinter as tk
@@ -1291,6 +1334,9 @@ class SeestarApp(ctk.CTk):
         
         # Bind selection event
         self.fits_file_listbox.bind('<<ListboxSelect>>', self.on_listbox_select)
+        
+        # Bind double-click to toggle mark
+        self.fits_file_listbox.bind('<Double-Button-1>', self._on_listbox_double_click)
         
         # Right panel - preview with zoom controls
         right_panel = ctk.CTkFrame(content_frame)
@@ -1324,10 +1370,11 @@ class SeestarApp(ctk.CTk):
             text="+", 
             width=30, 
             height=30,
-            font=self.get_font(14, weight="bold"),
+            font=self.get_font(14),
+            text_color="black",
             command=self.zoom_fits_in,
-            fg_color="#3498db",
-            hover_color="#2980b9"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.zoom_in_btn.pack(pady=(0, 5))
         self._create_tooltip(self.zoom_in_btn, "Zoom In")
@@ -1347,10 +1394,11 @@ class SeestarApp(ctk.CTk):
             text="−", 
             width=30, 
             height=30,
-            font=self.get_font(14, weight="bold"),
+            font=self.get_font(14),
+            text_color="black",
             command=self.zoom_fits_out,
-            fg_color="#3498db",
-            hover_color="#2980b9"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.zoom_out_btn.pack(pady=(5, 0))
         self._create_tooltip(self.zoom_out_btn, "Zoom Out")
@@ -1361,24 +1409,26 @@ class SeestarApp(ctk.CTk):
         
         self.prev_btn = ctk.CTkButton(
             nav_frame,
-            text="◀ Previous",
+            text="Previous",
             width=80,
-            font=self.get_font(11),
+            font=self.get_font(10),
+            text_color="black",
             command=lambda: self.navigate_fits_files(-1),
-            fg_color="#3498db",
-            hover_color="#2980b9"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.prev_btn.pack(side="left", padx=2)
         self._create_tooltip(self.prev_btn, "Previous Image")
         
         self.next_btn = ctk.CTkButton(
             nav_frame,
-            text="Next ▶",
+            text="Next",
             width=80,
-            font=self.get_font(11),
+            font=self.get_font(10),
+            text_color="black",
             command=lambda: self.navigate_fits_files(1),
-            fg_color="#3498db",
-            hover_color="#2980b9"
+            fg_color="#E67E22",
+            hover_color="#D35400"
         )
         self.next_btn.pack(side="right", padx=2)
         self._create_tooltip(self.next_btn, "Next Image")
@@ -1418,7 +1468,6 @@ class SeestarApp(ctk.CTk):
         self._update_zoom_display()
         self.fits_preview_label.configure(text="Select a FITS file to preview", image=None)
         self.analysis_progress_label.configure(text="")
-        self.auto_mark_btn.configure(state="disabled")
         
         self.current_fits_directory = directory
         self.fits_viewer_dir_label.configure(text=directory)
@@ -1640,6 +1689,18 @@ class SeestarApp(ctk.CTk):
             self.next_btn.configure(state="disabled")
         else:
             self.next_btn.configure(state="normal")
+    
+    def _on_listbox_double_click(self, event):
+        """Handle double-click to toggle mark on clicked item."""
+        # Get the index of the clicked item
+        index = self.fits_file_listbox.nearest(event.y)
+        if index >= 0 and index < len(self.fits_files):
+            # Select the item
+            self.fits_file_listbox.selection_clear(0, "end")
+            self.fits_file_listbox.selection_set(index)
+            self.selected_fits_index = index
+            # Toggle mark
+            self.toggle_mark_selected()
     
     def toggle_mark_selected(self):
         """Toggle mark for deletion on currently selected file."""
@@ -1949,10 +2010,6 @@ class SeestarApp(ctk.CTk):
         total = len(self.quality_reports)
         
         self.analysis_progress_label.configure(text=f"Done: {problematic}/{total} problematic")
-        
-        # Enable auto-mark button if there are problematic files
-        if problematic > 0:
-            self.auto_mark_btn.configure(state="normal")
         
         # Refresh list to show indicators
         self.refresh_fits_file_list()
