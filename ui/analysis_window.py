@@ -573,6 +573,10 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.location_tags = location_tags
         self.current_project = None  # Track currently selected project for view refresh
         
+        # Pre-load common names for all objects so they're available in the UI
+        # This queries SIMBAD in batch for any unknown objects
+        lookup_common_names_batch(self.results['projects'])
+        
         self.setup_ui()
         
         # Bring window to front
@@ -978,7 +982,16 @@ class AnalysisWindow(ctk.CTkToplevel):
         unique_frame = ctk.CTkFrame(parent)
         unique_frame.pack(fill="x", padx=10, pady=(0, 10))
         
-        objects_text = f"Objects: {', '.join(stats['unique_objects'])}" if stats['unique_objects'] else "Objects: None"
+        # Format unique objects with common names
+        object_texts = []
+        for obj in stats['unique_objects']:
+            common = get_common_name(obj)
+            if common:
+                object_texts.append(f"{obj} ({common})")
+            else:
+                object_texts.append(obj)
+        
+        objects_text = f"Objects: {', '.join(object_texts)}" if object_texts else "Objects: None"
         filters_text = f"Filters: {', '.join(stats['unique_filters'])}" if stats['unique_filters'] else "Filters: None"
         
         objects_textbox = ctk.CTkTextbox(unique_frame, height=30)
@@ -1111,11 +1124,20 @@ class AnalysisWindow(ctk.CTkToplevel):
                     coord_textbox.insert("1.0", f"Lat: {avg_lat:.6f}, Lon: {avg_lon:.6f}")
                     coord_textbox.configure(state="disabled", font=self.get_font(12))
                 
-                # Objects row
+                # Objects row with common names
                 if all_objects:
+                    # Format objects with common names
+                    loc_object_texts = []
+                    for obj in sorted(all_objects):
+                        common = get_common_name(obj)
+                        if common:
+                            loc_object_texts.append(f"{obj} ({common})")
+                        else:
+                            loc_object_texts.append(obj)
+                    
                     obj_textbox = ctk.CTkTextbox(loc_card, height=30)
                     obj_textbox.pack(fill="x", padx=10, pady=(0, 5))
-                    obj_textbox.insert("1.0", f"Objects: {', '.join(sorted(all_objects))}")
+                    obj_textbox.insert("1.0", f"Objects: {', '.join(loc_object_texts)}")
                     obj_textbox.configure(state="disabled", font=self.get_font(12))
                 
                 # Google Maps button
@@ -1150,11 +1172,26 @@ class AnalysisWindow(ctk.CTkToplevel):
     
     def create_project_button(self, parent, project):
         """Create a clickable button for a single project."""
+        # Format button text with common names if available
+        objects = project.get('objects', set())
+        if objects:
+            # Get common names for all objects in this project
+            obj_texts = []
+            for obj in objects:
+                common = get_common_name(obj)
+                if common:
+                    obj_texts.append(f"{obj} ({common})")
+                else:
+                    obj_texts.append(obj)
+            button_text = f"{project['name']}\n{', '.join(obj_texts)}"
+        else:
+            button_text = project['name']
+        
         button = ctk.CTkButton(
             parent,
-            text=project['name'],
-            font=self.get_font(14),
-            height=40,
+            text=button_text,
+            font=self.get_font(12),
+            height=50,
             command=lambda: self.show_project_details(project)
         )
         button.pack(fill="x", pady=5)
@@ -1543,6 +1580,26 @@ class AnalysisWindow(ctk.CTkToplevel):
             filter_textbox.insert("1.0", ', '.join(project['filters']))
             filter_textbox.configure(state="disabled", font=self.get_font(14))
         
+        # Objects with common names
+        if project['objects']:
+            objects_label = ctk.CTkLabel(summary_content, text="Objects", font=self.get_font(12, weight="bold"))
+            objects_label.pack(anchor="w", padx=10, pady=(10, 5))
+            
+            # Format objects with common names
+            object_texts = []
+            for obj in project['objects']:
+                common = get_common_name(obj)
+                if common:
+                    object_texts.append(f"{obj} ({common})")
+                else:
+                    object_texts.append(obj)
+            
+            objects_text = ', '.join(object_texts)
+            objects_textbox = ctk.CTkTextbox(summary_content, height=30)
+            objects_textbox.pack(fill="x", padx=10, pady=(0, 10))
+            objects_textbox.insert("1.0", objects_text)
+            objects_textbox.configure(state="disabled", font=self.get_font(14))
+        
         # Exposures
         if project['exposures']:
             exp_label = ctk.CTkLabel(summary_content, text="Exposure Times", font=self.get_font(12, weight="bold"))
@@ -1584,7 +1641,10 @@ class AnalysisWindow(ctk.CTkToplevel):
                 session_content.pack(fill="x", padx=10, pady=(0, 10))
                 session_content.pack_forget()  # Initially collapsed
                 
-                session_button_text = f"▶ {obj} - Session {idx + 1}: {self._format_datetime(start)}"
+                # Format session button with common name
+                obj_common = get_common_name(obj)
+                obj_button_text = f"{obj} ({obj_common})" if obj_common else obj
+                session_button_text = f"▶ {obj_button_text} - Session {idx + 1}: {self._format_datetime(start)}"
                 session_button = ctk.CTkButton(
                     session_frame,
                     text=session_button_text,
@@ -1651,10 +1711,12 @@ class AnalysisWindow(ctk.CTkToplevel):
                 object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=self.get_font(12, weight="bold"))
                 object_info_label.pack(anchor="w", padx=10, pady=(5, 2))
                 
-                # Object name
+                # Object name with common name
+                obj_common = get_common_name(obj)
+                obj_display = f"Name: {obj}" + (f" ({obj_common})" if obj_common else "")
                 obj_textbox = ctk.CTkTextbox(session_content, height=25)
                 obj_textbox.pack(fill="x", padx=10, pady=2)
-                obj_textbox.insert("1.0", f"Name: {obj}")
+                obj_textbox.insert("1.0", obj_display)
                 obj_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 # RA/DEC coordinates
