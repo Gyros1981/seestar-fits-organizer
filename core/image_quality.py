@@ -49,6 +49,7 @@ class QualityReport:
     issues: List[str]
     is_problematic: bool
     analysis_time_ms: float
+    raw_streak_ratio: float = 0.0  # Raw measurement for threshold re-application
 
 
 class ImageQualityAnalyzer:
@@ -117,10 +118,10 @@ class ImageQualityAnalyzer:
         
         # Detect streaks (use fast method if available)
         if SKIMAGE_AVAILABLE and not fast_mode:
-            has_streaks, streak_count, streak_conf = self._detect_streaks(image_data)
+            has_streaks, streak_count, streak_conf, raw_ratio = self._detect_streaks(image_data)
         else:
             # Use simple fast detection for speed
-            has_streaks, streak_count, streak_conf = self._detect_streaks_simple(image_data)
+            has_streaks, streak_count, streak_conf, raw_ratio = self._detect_streaks_simple(image_data)
         
         if has_streaks:
             issues.append(f"{streak_count} streak(s) detected")
@@ -158,15 +159,16 @@ class ImageQualityAnalyzer:
             background_gradient=gradient,
             issues=issues,
             is_problematic=is_problematic,
-            analysis_time_ms=analysis_time
+            analysis_time_ms=analysis_time,
+            raw_streak_ratio=raw_ratio
         )
     
-    def _detect_streaks(self, image: np.ndarray) -> Tuple[bool, int, float]:
+    def _detect_streaks(self, image: np.ndarray) -> Tuple[bool, int, float, float]:
         """
         Detect straight line streaks using Hough Transform.
         
         Returns:
-            (has_streaks, streak_count, confidence)
+            (has_streaks, streak_count, confidence, raw_streak_ratio)
         """
         # Normalize image
         img_norm = (image - image.min()) / (image.max() - image.min() + 1e-8)
@@ -181,8 +183,11 @@ class ImageQualityAnalyzer:
         # Find peaks
         peaks = hough_line_peaks(h, theta, d, min_distance=20, min_angle=10, threshold=np.max(h) * 0.3)
         
+        # Calculate raw ratio from edge density (for re-thresholding)
+        edge_ratio = np.sum(edges) / edges.size
+        
         if len(peaks[0]) == 0:
-            return False, 0, 0.0
+            return False, 0, 0.0, edge_ratio
         
         # Count significant lines
         streak_count = len(peaks[0])
@@ -200,7 +205,10 @@ class ImageQualityAnalyzer:
         has_streaks = valid_streaks > 0
         confidence = min(1.0, valid_streaks / 3.0)
         
-        return has_streaks, valid_streaks, confidence
+        # Use max of edge_ratio and a small value based on valid_streaks
+        raw_ratio = max(edge_ratio, valid_streaks * 0.0001)
+        
+        return has_streaks, valid_streaks, confidence, raw_ratio
     
     def _extract_line_mask(self, edges: np.ndarray, angle: float, dist: float) -> np.ndarray:
         """Extract a mask of pixels along a Hough line."""
@@ -223,8 +231,11 @@ class ImageQualityAnalyzer:
         
         return mask
     
-    def _detect_streaks_simple(self, image: np.ndarray) -> Tuple[bool, int, float]:
-        """Improved streak detection using gradient analysis."""
+    def _detect_streaks_simple(self, image: np.ndarray) -> Tuple[bool, int, float, float]:
+        """Improved streak detection using gradient analysis.
+        
+        Returns: (has_streaks, streak_count, confidence, raw_streak_ratio)
+        """
         from scipy.ndimage import gaussian_filter
         
         # Smooth slightly to reduce noise
@@ -483,6 +494,61 @@ class ImageQualityAnalyzer:
             quality = 'good'
         
         return quality, avg_fwhm, avg_ecc
+    
+    def reapply_threshold(self, report: QualityReport) -> QualityReport:
+        """
+        Re-apply streak detection threshold to an existing report.
+        Uses cached raw_streak_ratio to determine has_streaks without re-analyzing image.
+        
+        Args:
+            report: Existing QualityReport with raw_streak_ratio
+            
+        Returns:
+            Updated QualityReport with new threshold applied
+        """
+        if report.raw_streak_ratio == 0.0:
+            # No cached ratio, can't re-apply
+            return report
+        
+        # Calculate adjusted threshold based on sensitivity
+        base_threshold = 0.00006
+        adjusted_threshold = base_threshold / self.streak_sensitivity
+        
+        # Re-evaluate streak detection
+        raw_ratio = report.raw_streak_ratio
+        has_streaks = raw_ratio > adjusted_threshold
+        streak_count = max(1, int(raw_ratio * 10000)) if has_streaks else 0
+        confidence = min(1.0, raw_ratio * 1000) if has_streaks else 0.0
+        
+        # Rebuild issues list
+        issues = []
+        if has_streaks:
+            issues.append(f"{streak_count} streak(s) detected")
+        if report.star_quality == 'poor':
+            issues.append("Poor star quality (trailing/stretched)")
+        elif report.star_quality == 'fair':
+            issues.append("Fair star quality")
+        if report.background_gradient > self.gradient_threshold:
+            issues.append("Uneven background illumination")
+        
+        # Re-evaluate problematic status
+        is_problematic = has_streaks or report.star_quality == 'poor'
+        
+        # Return updated report
+        return QualityReport(
+            file_path=report.file_path,
+            has_streaks=has_streaks,
+            streak_count=streak_count,
+            streak_confidence=confidence,
+            star_quality=report.star_quality,
+            avg_fwhm=report.avg_fwhm,
+            avg_eccentricity=report.avg_eccentricity,
+            background_gradient=report.background_gradient,
+            issues=issues,
+            is_problematic=is_problematic,
+            analysis_time_ms=report.analysis_time_ms,
+            raw_streak_ratio=report.raw_streak_ratio
+        )
     
     def _detect_background_gradient(self, image: np.ndarray) -> float:
         """Detect uneven background illumination."""

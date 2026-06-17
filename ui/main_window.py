@@ -1800,6 +1800,37 @@ class SeestarApp(ctk.CTk):
         
         self.current_sensitivity = sensitivity_map.get(choice, 0.5)
         logger.info(f"Analysis sensitivity set to {choice} ({self.current_sensitivity})")
+        
+        # If we have cached reports, re-apply the new threshold
+        if hasattr(self, 'quality_reports') and self.quality_reports:
+            self._reapply_analysis_threshold()
+    
+    def _reapply_analysis_threshold(self):
+        """Re-apply current sensitivity threshold to cached analysis results."""
+        try:
+            from core.image_quality import ImageQualityAnalyzer
+            
+            analyzer = ImageQualityAnalyzer(streak_sensitivity=self.current_sensitivity)
+            
+            # Re-apply threshold to all cached reports
+            updated_count = 0
+            for idx, report in self.quality_reports.items():
+                if hasattr(report, 'raw_streak_ratio') and report.raw_streak_ratio > 0:
+                    new_report = analyzer.reapply_threshold(report)
+                    self.quality_reports[idx] = new_report
+                    if new_report.is_problematic != report.is_problematic:
+                        updated_count += 1
+            
+            # Refresh the file list display
+            self.refresh_fits_file_list()
+            
+            # Update status
+            status_msg = f"Re-applied threshold: {updated_count} files changed status"
+            self.fits_status_label.configure(text=status_msg)
+            logger.info(status_msg)
+            
+        except Exception as e:
+            logger.error(f"Error re-applying threshold: {e}")
     
     def analyze_all_fits(self):
         """Run quality analysis on all FITS files in the current directory."""
