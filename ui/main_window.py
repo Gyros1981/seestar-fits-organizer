@@ -1206,6 +1206,39 @@ class SeestarApp(ctk.CTk):
         self.delete_marked_btn = ctk.CTkButton(action_frame, text="🗑️ Delete Marked", command=self.delete_marked_fits, width=110, font=self.get_font(11), fg_color="#C0392B", hover_color="#A93226")
         self.delete_marked_btn.pack(side="right", padx=2)
         
+        # Analysis button row
+        analysis_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        analysis_frame.pack(fill="x", padx=5, pady=(0, 5))
+        
+        self.analyze_all_btn = ctk.CTkButton(
+            analysis_frame, 
+            text="🔍 Analyze All", 
+            command=self.analyze_all_fits,
+            width=120, 
+            font=self.get_font(11), 
+            fg_color="#8E44AD", 
+            hover_color="#7D3C98"
+        )
+        self.analyze_all_btn.pack(side="left", padx=2)
+        self._create_tooltip(self.analyze_all_btn, "Analyze all images for streaks and star quality")
+        
+        self.auto_mark_btn = ctk.CTkButton(
+            analysis_frame, 
+            text="⚠️ Auto-Mark Bad", 
+            command=self.auto_mark_problematic,
+            width=120, 
+            font=self.get_font(11), 
+            fg_color="#E74C3C", 
+            hover_color="#C0392B"
+        )
+        self.auto_mark_btn.pack(side="left", padx=2)
+        self.auto_mark_btn.configure(state="disabled")  # Enabled after analysis
+        self._create_tooltip(self.auto_mark_btn, "Mark all problematic images for deletion")
+        
+        # Progress label for analysis
+        self.analysis_progress_label = ctk.CTkLabel(analysis_frame, text="", font=self.get_font(10), text_color="#B0B0B0")
+        self.analysis_progress_label.pack(side="right", padx=5)
+        
         # File list using tk.Listbox for performance
         import tkinter as tk
         list_frame = ctk.CTkFrame(left_panel)
@@ -1337,6 +1370,10 @@ class SeestarApp(ctk.CTk):
         self.selected_fits_index = -1
         self.marked_for_deletion = set()  # Set of indices marked for deletion
         self.fits_zoom_level = 1.0  # Zoom level (0.3 to 4.0)
+        
+        # Analysis results storage
+        self.quality_reports = {}  # Dict mapping file index to QualityReport
+        self.analysis_in_progress = False
     
     def browse_fits_directory(self):
         """Browse for a directory containing FITS files."""
@@ -1349,9 +1386,12 @@ class SeestarApp(ctk.CTk):
         # Clear UI state first
         self.selected_fits_index = -1
         self.marked_for_deletion = set()
+        self.quality_reports = {}  # Clear analysis results
         self.fits_zoom_level = 1.0  # Reset zoom to 100%
         self._update_zoom_display()
         self.fits_preview_label.configure(text="Select a FITS file to preview", image=None)
+        self.analysis_progress_label.configure(text="")
+        self.auto_mark_btn.configure(state="disabled")
         
         self.current_fits_directory = directory
         self.fits_viewer_dir_label.configure(text=directory)
@@ -1374,16 +1414,32 @@ class SeestarApp(ctk.CTk):
             self._update_nav_buttons()
     
     def refresh_fits_file_list(self):
-        """Refresh the file list display with marked status."""
+        """Refresh the file list display with marked status and quality indicators."""
         # Clear listbox
         self.fits_file_listbox.delete(0, "end")
         
-        # Add files with mark indicator
+        # Add files with mark indicator and quality icons
         for i, file_path in enumerate(self.fits_files):
+            # Build status indicators
+            indicators = []
+            
+            # Mark status
             if i in self.marked_for_deletion:
-                display_text = f"[✓] {file_path.name}"
+                indicators.append("[✓]")
             else:
-                display_text = f"[ ] {file_path.name}"
+                indicators.append("[ ]")
+            
+            # Quality indicators from analysis
+            if i in self.quality_reports:
+                report = self.quality_reports[i]
+                if report.has_streaks:
+                    indicators.append("🛰️")
+                if report.star_quality == 'poor':
+                    indicators.append("⭐")
+                elif report.star_quality == 'fair':
+                    indicators.append("~")
+            
+            display_text = f"{' '.join(indicators)} {file_path.name}"
             self.fits_file_listbox.insert("end", display_text)
     
     
@@ -1395,7 +1451,22 @@ class SeestarApp(ctk.CTk):
             self.selected_fits_index = index
             file_path = self.fits_files[index]
             self.show_fits_preview(file_path)
-            self.fits_status_label.configure(text=f"Selected: {file_path.name}")
+            
+            # Build status text with quality info if available
+            status_text = f"Selected: {file_path.name}"
+            if index in self.quality_reports:
+                report = self.quality_reports[index]
+                issues = []
+                if report.has_streaks:
+                    issues.append("🛰️ streaks")
+                if report.star_quality == 'poor':
+                    issues.append("⭐ poor stars")
+                if issues:
+                    status_text += f" | {' | '.join(issues)}"
+                else:
+                    status_text += " | ✓ good quality"
+            
+            self.fits_status_label.configure(text=status_text)
             self._update_nav_buttons()
     
     def navigate_fits_files(self, direction):
@@ -1690,6 +1761,171 @@ class SeestarApp(ctk.CTk):
             normalized = np.zeros_like(data)
         
         return np.clip(normalized, 0, 1)
+    
+    def analyze_all_fits(self):
+        """Run quality analysis on all FITS files in the current directory."""
+        if not self.fits_files:
+            messagebox.showinfo("No Files", "No FITS files to analyze. Please select a directory first.")
+            return
+        
+        if self.analysis_in_progress:
+            messagebox.showinfo("Analysis Running", "Analysis is already in progress.")
+            return
+        
+        self.analysis_in_progress = True
+        self.analyze_all_btn.configure(state="disabled")
+        self.analysis_progress_label.configure(text="Starting analysis...")
+        
+        # Run analysis in background thread
+        thread = threading.Thread(target=self._analyze_all_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def _analyze_all_thread(self):
+        """Background thread for analyzing all files."""
+        try:
+            from astropy.io import fits
+            from core.image_quality import ImageQualityAnalyzer
+            
+            total = len(self.fits_files)
+            analyzer = ImageQualityAnalyzer()
+            
+            for i, file_path in enumerate(self.fits_files):
+                try:
+                    # Update progress on main thread
+                    self.after(0, lambda idx=i, tot=total: 
+                        self.analysis_progress_label.configure(text=f"Analyzing {idx+1}/{tot}..."))
+                    
+                    # Load FITS data
+                    with fits.open(file_path) as hdul:
+                        data = hdul[0].data
+                        
+                        if data is not None:
+                            # Analyze
+                            report = analyzer.analyze_image(data, file_path)
+                            self.quality_reports[i] = report
+                    
+                except Exception as e:
+                    logger.error(f"Failed to analyze {file_path}: {e}")
+                    continue
+            
+            # Analysis complete - update UI on main thread
+            self.after(0, self._analysis_complete)
+            
+        except Exception as e:
+            logger.error(f"Analysis thread error: {e}")
+            self.after(0, lambda: self._analysis_error(str(e)))
+    
+    def _analysis_complete(self):
+        """Called when analysis is complete."""
+        self.analysis_in_progress = False
+        self.analyze_all_btn.configure(state="normal")
+        
+        # Count issues
+        problematic = sum(1 for r in self.quality_reports.values() if r.is_problematic)
+        total = len(self.quality_reports)
+        
+        self.analysis_progress_label.configure(text=f"Done: {problematic}/{total} problematic")
+        
+        # Enable auto-mark button if there are problematic files
+        if problematic > 0:
+            self.auto_mark_btn.configure(state="normal")
+        
+        # Refresh list to show indicators
+        self.refresh_fits_file_list()
+        
+        # Show summary dialog
+        if problematic > 0:
+            streaks = sum(1 for r in self.quality_reports.values() if r.has_streaks)
+            poor_stars = sum(1 for r in self.quality_reports.values() if r.star_quality == 'poor')
+            messagebox.showinfo(
+                "Analysis Complete",
+                f"Analyzed {total} images\n\n"
+                f"Issues found:\n"
+                f"  🛰️ {streaks} with satellite/airplane streaks\n"
+                f"  ⭐ {poor_stars} with poor star quality\n\n"
+                f"Use '⚠️ Auto-Mark Bad' to mark problematic images for deletion."
+            )
+        else:
+            messagebox.showinfo("Analysis Complete", f"Analyzed {total} images. No issues found!")
+    
+    def _analysis_error(self, error_msg: str):
+        """Called when analysis encounters an error."""
+        self.analysis_in_progress = False
+        self.analyze_all_btn.configure(state="normal")
+        self.analysis_progress_label.configure(text="Analysis failed")
+        messagebox.showerror("Analysis Error", f"Failed to analyze images:\n{error_msg}")
+    
+    def auto_mark_problematic(self):
+        """Automatically mark all problematic images for deletion."""
+        if not self.quality_reports:
+            messagebox.showinfo("No Analysis", "Please run analysis first.")
+            return
+        
+        marked = 0
+        for i, report in self.quality_reports.items():
+            if report.is_problematic:
+                self.marked_for_deletion.add(i)
+                marked += 1
+        
+        self.refresh_fits_file_list()
+        self.fits_status_label.configure(text=f"Auto-marked {marked} problematic image(s) for deletion")
+        
+        if marked > 0:
+            messagebox.showinfo(
+                "Auto-Mark Complete",
+                f"Marked {marked} problematic image(s) for deletion.\n\n"
+                f"Click '🗑️ Delete Marked' to remove them, or use '✓ Mark' to unmark individual files."
+            )
+    
+    def show_quality_details(self):
+        """Show quality details for the currently selected image."""
+        if self.selected_fits_index < 0:
+            return
+        
+        if self.selected_fits_index not in self.quality_reports:
+            return
+        
+        report = self.quality_reports[self.selected_fits_index]
+        
+        # Build details text
+        details = f"Quality Report for: {report.file_path.name}\n\n"
+        
+        if report.has_streaks:
+            details += f"🛰️ Streaks: {report.streak_count} detected (confidence: {report.streak_confidence:.1%})\n"
+        else:
+            details += "✓ No streaks detected\n"
+        
+        details += f"\n⭐ Star Quality: {report.star_quality.upper()}\n"
+        details += f"   Average FWHM: {report.avg_fwhm:.2f} pixels\n"
+        details += f"   Eccentricity: {report.avg_eccentricity:.2f}\n"
+        
+        if report.background_gradient > 0.3:
+            details += f"\n⚠️ Uneven background (gradient: {report.background_gradient:.2f})\n"
+        
+        if report.issues:
+            details += f"\nIssues:\n"
+            for issue in report.issues:
+                details += f"  • {issue}\n"
+        
+        if report.is_problematic:
+            details += "\n⚠️ This image is flagged as problematic."
+        else:
+            details += "\n✓ This image looks good."
+        
+        # Show in dialog
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Image Quality Details")
+        dialog.geometry("400x400")
+        dialog.transient(self)
+        
+        textbox = ctk.CTkTextbox(dialog, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        textbox.insert("1.0", details)
+        textbox.configure(state="disabled")
+        
+        close_btn = ctk.CTkButton(dialog, text="Close", command=dialog.destroy)
+        close_btn.pack(pady=10)
 
     def _create_settings_frame(self):
         """Create Settings mode frame (hidden initially)."""
