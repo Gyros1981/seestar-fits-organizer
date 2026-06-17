@@ -275,7 +275,7 @@ class ImageQualityAnalyzer:
         logger.debug(f"Streak detection: strong_pixels={strong_pixels}, ratio={strong_ratio:.4f}, "
                      f"has_streaks={has_streaks}, confidence={confidence:.2f}")
         
-        return has_streaks, streak_count, confidence
+        return has_streaks, streak_count, confidence, strong_ratio
     
     def _analyze_star_shapes(self, image: np.ndarray) -> Tuple[str, float, float]:
         """

@@ -1222,25 +1222,29 @@ class SeestarApp(ctk.CTk):
         self.analyze_all_btn.pack(side="left", padx=2)
         self._create_tooltip(self.analyze_all_btn, "Analyze all images for streaks and star quality")
         
-        # Sensitivity selector (7 levels)
-        self.sensitivity_menu = ctk.CTkOptionMenu(
-            analysis_frame,
-            values=[
-                "1 - Very Strict",
-                "2 - Strict", 
-                "3 - Moderately Strict",
-                "4 - Balanced",
-                "5 - Moderate",
-                "6 - Lenient",
-                "7 - Very Lenient"
-            ],
-            width=140,
-            font=self.get_font(10),
-            command=self._on_sensitivity_change
+        # Sensitivity slider with label
+        self.sensitivity_frame = ctk.CTkFrame(analysis_frame, fg_color="transparent")
+        self.sensitivity_frame.pack(side="left", padx=(0, 2), fill="y")
+        
+        self.sensitivity_label = ctk.CTkLabel(
+            self.sensitivity_frame, 
+            text="Strict", 
+            font=self.get_font(9),
+            width=50
         )
-        self.sensitivity_menu.pack(side="left", padx=(0, 2))
-        self.sensitivity_menu.set("4 - Balanced")  # Default
-        self._create_tooltip(self.sensitivity_menu, "Streak detection sensitivity: lower = fewer false positives")
+        self.sensitivity_label.pack(side="left")
+        
+        self.sensitivity_slider = ctk.CTkSlider(
+            self.sensitivity_frame,
+            from_=0.1,
+            to=1.5,
+            number_of_steps=14,
+            width=120,
+            command=self._on_sensitivity_slide
+        )
+        self.sensitivity_slider.pack(side="left", padx=5)
+        self.sensitivity_slider.set(0.5)  # Default: Balanced
+        self._create_tooltip(self.sensitivity_slider, "Drag to adjust detection sensitivity in real-time")
         
         # Store current sensitivity value
         self.current_sensitivity = 0.5
@@ -1784,6 +1788,32 @@ class SeestarApp(ctk.CTk):
             normalized = np.zeros_like(data)
         
         return np.clip(normalized, 0, 1)
+    
+    def _on_sensitivity_slide(self, value):
+        """Handle real-time slider adjustment."""
+        self.current_sensitivity = float(value)
+        
+        # Update label based on value
+        if value <= 0.25:
+            label_text = "Very Strict"
+        elif value <= 0.35:
+            label_text = "Strict"
+        elif value <= 0.45:
+            label_text = "Mod Strict"
+        elif value <= 0.6:
+            label_text = "Balanced"
+        elif value <= 0.85:
+            label_text = "Moderate"
+        elif value <= 1.25:
+            label_text = "Lenient"
+        else:
+            label_text = "Very Lenient"
+        
+        self.sensitivity_label.configure(text=label_text)
+        
+        # If we have cached reports, re-apply the new threshold in real-time
+        if hasattr(self, 'quality_reports') and self.quality_reports:
+            self._reapply_analysis_threshold()
     
     def _on_sensitivity_change(self, choice):
         """Handle sensitivity level change from dropdown."""
