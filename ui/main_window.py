@@ -1214,13 +1214,36 @@ class SeestarApp(ctk.CTk):
             analysis_frame, 
             text="🔍 Analyze All", 
             command=self.analyze_all_fits,
-            width=120, 
+            width=110, 
             font=self.get_font(11), 
             fg_color="#8E44AD", 
             hover_color="#7D3C98"
         )
         self.analyze_all_btn.pack(side="left", padx=2)
         self._create_tooltip(self.analyze_all_btn, "Analyze all images for streaks and star quality")
+        
+        # Sensitivity selector (7 levels)
+        self.sensitivity_menu = ctk.CTkOptionMenu(
+            analysis_frame,
+            values=[
+                "1 - Very Strict",
+                "2 - Strict", 
+                "3 - Moderately Strict",
+                "4 - Balanced",
+                "5 - Moderate",
+                "6 - Lenient",
+                "7 - Very Lenient"
+            ],
+            width=140,
+            font=self.get_font(10),
+            command=self._on_sensitivity_change
+        )
+        self.sensitivity_menu.pack(side="left", padx=(0, 2))
+        self.sensitivity_menu.set("4 - Balanced")  # Default
+        self._create_tooltip(self.sensitivity_menu, "Streak detection sensitivity: lower = fewer false positives")
+        
+        # Store current sensitivity value
+        self.current_sensitivity = 0.5
         
         self.auto_mark_btn = ctk.CTkButton(
             analysis_frame, 
@@ -1762,6 +1785,22 @@ class SeestarApp(ctk.CTk):
         
         return np.clip(normalized, 0, 1)
     
+    def _on_sensitivity_change(self, choice):
+        """Handle sensitivity level change from dropdown."""
+        # Map choice to sensitivity value
+        sensitivity_map = {
+            "1 - Very Strict": 0.2,
+            "2 - Strict": 0.3,
+            "3 - Moderately Strict": 0.4,
+            "4 - Balanced": 0.5,
+            "5 - Moderate": 0.7,
+            "6 - Lenient": 1.0,
+            "7 - Very Lenient": 1.5
+        }
+        
+        self.current_sensitivity = sensitivity_map.get(choice, 0.5)
+        logger.info(f"Analysis sensitivity set to {choice} ({self.current_sensitivity})")
+    
     def analyze_all_fits(self):
         """Run quality analysis on all FITS files in the current directory."""
         if not self.fits_files:
@@ -1788,33 +1827,56 @@ class SeestarApp(ctk.CTk):
             from core.image_quality import ImageQualityAnalyzer
             
             total = len(self.fits_files)
-            analyzer = ImageQualityAnalyzer()
+            logger.info(f"Starting analysis of {total} files...")
+            
+            # Use fast mode for batch analysis with selected sensitivity
+            analyzer = ImageQualityAnalyzer(streak_sensitivity=self.current_sensitivity)
+            logger.info("Analyzer initialized successfully (fast mode, strict sensitivity)")
             
             for i, file_path in enumerate(self.fits_files):
                 try:
-                    # Update progress on main thread
-                    self.after(0, lambda idx=i, tot=total: 
-                        self.analysis_progress_label.configure(text=f"Analyzing {idx+1}/{tot}..."))
+                    # Update progress every file
+                    progress_text = f"Analyzing {i+1}/{total}..."
+                    self.after(0, lambda t=progress_text: self._safe_update_progress(t))
                     
                     # Load FITS data
                     with fits.open(file_path) as hdul:
                         data = hdul[0].data
                         
                         if data is not None:
-                            # Analyze
-                            report = analyzer.analyze_image(data, file_path)
+                            # Analyze in fast mode for speed
+                            report = analyzer.analyze_image(data, file_path, fast_mode=True)
                             self.quality_reports[i] = report
+                            
+                            # Log progress every 10 files
+                            if (i + 1) % 10 == 0:
+                                logger.info(f"Analyzed {i+1}/{total} files")
+                        else:
+                            logger.warning(f"No data in {file_path.name}")
                     
                 except Exception as e:
                     logger.error(f"Failed to analyze {file_path}: {e}")
+                    import traceback
+                    logger.debug(traceback.format_exc())
                     continue
             
+            logger.info(f"Analysis complete. Processed {len(self.quality_reports)} files.")
             # Analysis complete - update UI on main thread
             self.after(0, self._analysis_complete)
             
         except Exception as e:
             logger.error(f"Analysis thread error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             self.after(0, lambda: self._analysis_error(str(e)))
+    
+    def _safe_update_progress(self, text: str):
+        """Safely update progress label from any thread."""
+        try:
+            if hasattr(self, 'analysis_progress_label') and self.analysis_progress_label.winfo_exists():
+                self.analysis_progress_label.configure(text=text)
+        except Exception as e:
+            logger.debug(f"Failed to update progress: {e}")
     
     def _analysis_complete(self):
         """Called when analysis is complete."""

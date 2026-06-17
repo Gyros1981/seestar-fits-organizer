@@ -55,7 +55,7 @@ class ImageQualityAnalyzer:
     """Analyzes FITS images for quality issues."""
     
     def __init__(self, 
-                 streak_threshold: float = 0.3,
+                 streak_sensitivity: float = 1.0,
                  min_streak_length: int = 50,
                  fwhm_threshold: float = 5.0,
                  eccentricity_threshold: float = 0.5,
@@ -64,13 +64,13 @@ class ImageQualityAnalyzer:
         Initialize analyzer with detection thresholds.
         
         Args:
-            streak_threshold: Sensitivity for streak detection (0.0-1.0, lower = more sensitive)
+            streak_sensitivity: Sensitivity for streak detection (0.1-2.0, lower = less sensitive/more strict)
             min_streak_length: Minimum pixel length to consider as streak
             fwhm_threshold: Maximum FWHM in pixels for 'good' stars
             eccentricity_threshold: Max eccentricity for round stars (0.0 = perfect circle, 1.0 = line)
             gradient_threshold: Max background gradient for even illumination
         """
-        self.streak_threshold = streak_threshold
+        self.streak_sensitivity = streak_sensitivity
         self.min_streak_length = min_streak_length
         self.fwhm_threshold = fwhm_threshold
         self.eccentricity_threshold = eccentricity_threshold
@@ -85,7 +85,7 @@ class ImageQualityAnalyzer:
                 f"{'photutils' if not PHOTUTILS_AVAILABLE else ''}"
             )
     
-    def analyze_image(self, image_data: np.ndarray, file_path: Optional[Path] = None) -> QualityReport:
+    def analyze_image(self, image_data: np.ndarray, file_path: Optional[Path] = None, fast_mode: bool = True) -> QualityReport:
         """
         Analyze a single image for quality issues.
         
@@ -99,25 +99,37 @@ class ImageQualityAnalyzer:
         import time
         start_time = time.time()
         
-        # Ensure 2D grayscale
+        # Ensure 2D grayscale and downsample if too large (for speed)
         if len(image_data.shape) == 3:
             image_data = np.mean(image_data, axis=2)
         
+        # Downsample large images for faster analysis
+        max_size = 1024 if fast_mode else 2048
+        h, w = image_data.shape
+        if fast_mode and (h > max_size or w > max_size):
+            from scipy.ndimage import zoom
+            zoom_factor = max_size / max(h, w)
+            new_h, new_w = int(h * zoom_factor), int(w * zoom_factor)
+            image_data = zoom(image_data, (new_h/h, new_w/w), order=1)
+            logger.debug(f"Downsampled image to {image_data.shape} for speed")
+        
         issues = []
         
-        # Detect streaks
-        if SKIMAGE_AVAILABLE:
+        # Detect streaks (use fast method if available)
+        if SKIMAGE_AVAILABLE and not fast_mode:
             has_streaks, streak_count, streak_conf = self._detect_streaks(image_data)
         else:
+            # Use simple fast detection for speed
             has_streaks, streak_count, streak_conf = self._detect_streaks_simple(image_data)
         
         if has_streaks:
             issues.append(f"{streak_count} streak(s) detected")
         
-        # Analyze star quality
-        if PHOTUTILS_AVAILABLE and SKIMAGE_AVAILABLE:
+        # Analyze star quality (use fast method in fast_mode)
+        if PHOTUTILS_AVAILABLE and not fast_mode:
             star_quality, avg_fwhm, avg_ecc = self._analyze_star_shapes(image_data)
         else:
+            # Use simple fast analysis
             star_quality, avg_fwhm, avg_ecc = self._analyze_star_shapes_simple(image_data)
         
         if star_quality == 'poor':
@@ -212,30 +224,45 @@ class ImageQualityAnalyzer:
         return mask
     
     def _detect_streaks_simple(self, image: np.ndarray) -> Tuple[bool, int, float]:
-        """Simple streak detection without scikit-image."""
-        # Look for high variance regions in specific directions
-        img_norm = (image - image.min()) / (image.max() - image.min() + 1e-8)
+        """Improved streak detection using gradient analysis."""
+        from scipy.ndimage import gaussian_filter
         
-        # Sobel edges
-        grad_x = np.abs(np.diff(img_norm, axis=1, prepend=0))
-        grad_y = np.abs(np.diff(img_norm, axis=0, prepend=0))
+        # Smooth slightly to reduce noise
+        img_smooth = gaussian_filter(image.astype(np.float64), sigma=1)
         
-        # Check for linear structures by looking at row/column variance
-        row_max = np.max(grad_x, axis=1)
-        col_max = np.max(grad_y, axis=0)
+        # Calculate gradients
+        grad_x = np.abs(np.diff(img_smooth, axis=1, prepend=img_smooth[:, 0:1]))
+        grad_y = np.abs(np.diff(img_smooth, axis=0, prepend=img_smooth[0:1, :]))
         
-        # Count rows/columns with strong gradients
-        strong_rows = np.sum(row_max > 0.5)
-        strong_cols = np.sum(col_max > 0.5)
+        # Strong gradient threshold - use percentage of max to catch spread-out high gradients
+        grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
         
-        # Suspicious if many rows or columns have strong edges
+        # Use 40% of max gradient as threshold
+        # This catches streaks which create many moderately-high gradient pixels
+        # while stars create fewer but higher peak gradients
+        max_grad = np.max(grad_magnitude)
+        strong_threshold = max_grad * 0.4
+        
+        # Count strong gradient pixels
+        strong_pixels = np.sum(grad_magnitude > strong_threshold)
+        
+        # Normalize by image size
         h, w = image.shape
-        row_ratio = strong_rows / h
-        col_ratio = strong_cols / w
+        total_pixels = h * w
+        strong_ratio = strong_pixels / total_pixels
         
-        has_streaks = row_ratio > 0.1 or col_ratio > 0.1
-        streak_count = max(int(row_ratio * 10), int(col_ratio * 10))
-        confidence = max(row_ratio, col_ratio)
+        # Detect streaks: high gradient pixels suggest linear features
+        # From measurements: bad ~0.0124%, good ~0.0061% at 40% threshold
+        # Base threshold at 0.01% (0.0001), adjusted by sensitivity
+        # sensitivity < 1 = stricter (higher threshold), > 1 = more lenient
+        base_threshold = 0.0001
+        adjusted_threshold = base_threshold / self.streak_sensitivity
+        has_streaks = strong_ratio > adjusted_threshold
+        streak_count = max(1, int(strong_ratio * 10000))  # Scale to approximate streak count
+        confidence = min(1.0, strong_ratio * 1000)  # Scale confidence
+        
+        logger.debug(f"Streak detection: strong_pixels={strong_pixels}, ratio={strong_ratio:.4f}, "
+                     f"has_streaks={has_streaks}, confidence={confidence:.2f}")
         
         return has_streaks, streak_count, confidence
     
@@ -272,10 +299,17 @@ class ImageQualityAnalyzer:
         fwhm_values = []
         eccentricities = []
         
+        # Debug: print available columns
+        logger.debug(f"DAOStarFinder columns: {list(sources.colnames)}")
+        
+        # Handle different column naming in photutils versions
+        x_col = 'xcentroid' if 'xcentroid' in sources.colnames else 'x_centroid' if 'x_centroid' in sources.colnames else 'x'
+        y_col = 'ycentroid' if 'ycentroid' in sources.colnames else 'y_centroid' if 'y_centroid' in sources.colnames else 'y'
+        
         for source in sources:
             # Get star properties
-            x = source['xcentroid']
-            y = source['ycentroid']
+            x = source[x_col]
+            y = source[y_col]
             
             # Extract small cutout around star
             cutout_size = 15
@@ -364,13 +398,29 @@ class ImageQualityAnalyzer:
         return fwhm
     
     def _analyze_star_shapes_simple(self, image: np.ndarray) -> Tuple[str, float, float]:
-        """Simple star analysis without photutils."""
-        # Detect bright spots using threshold
-        img_norm = (image - image.min()) / (image.max() - image.min() + 1e-8)
+        """Fast star analysis without photutils using gradient statistics."""
+        from scipy.ndimage import gaussian_filter, sobel
         
-        # Simple threshold for bright objects
-        threshold = np.percentile(img_norm, 95)
-        bright_mask = img_norm > threshold
+        # Normalize image
+        img_float = image.astype(np.float64)
+        
+        # Subtract background (simple median filter)
+        background = gaussian_filter(img_float, sigma=20)
+        img_sub = img_float - background
+        img_sub = np.clip(img_sub, 0, None)
+        
+        # Detect edges using Sobel
+        sobel_x = sobel(img_sub, axis=1)
+        sobel_y = sobel(img_sub, axis=0)
+        gradient_magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
+        
+        # Threshold to find bright regions (stars)
+        threshold = np.percentile(img_sub, 90)  # Top 10%
+        bright_mask = img_sub > threshold
+        
+        # Remove small noise
+        from scipy.ndimage import binary_opening
+        bright_mask = binary_opening(bright_mask, iterations=1)
         
         # Label connected components
         from scipy.ndimage import label
@@ -379,35 +429,55 @@ class ImageQualityAnalyzer:
         if num_features == 0:
             return 'unknown', 0.0, 0.0
         
-        # Analyze each bright spot
+        # Analyze star shapes
+        fwhm_values = []
         eccentricities = []
+        
         for i in range(1, min(num_features + 1, 51)):
             mask = labeled == i
             
-            # Calculate eccentricity from bounding box
+            # Get region properties
             coords = np.where(mask)
-            if len(coords[0]) < 5:
+            if len(coords[0]) < 3 or len(coords[0]) > 500:  # Filter size
                 continue
             
-            y_range = coords[0].max() - coords[0].min()
-            x_range = coords[1].max() - coords[1].min()
+            # Calculate centroid
+            y_coords, x_coords = coords
+            x_center = np.mean(x_coords)
+            y_center = np.mean(y_coords)
             
-            if y_range + x_range > 0:
-                # Approximate eccentricity
-                major = max(y_range, x_range)
-                minor = min(y_range, x_range) + 1e-6
-                ecc = np.sqrt(1 - (minor/major)**2)
+            # Calculate moments
+            x_diff = x_coords - x_center
+            y_diff = y_coords - y_center
+            
+            mu_20 = np.mean(x_diff**2)
+            mu_02 = np.mean(y_diff**2)
+            mu_11 = np.mean(x_diff * y_diff)
+            
+            # Eccentricity
+            if mu_20 + mu_02 > 0:
+                ecc = np.sqrt((mu_20 - mu_02)**2 + 4*mu_11**2) / (mu_20 + mu_02)
+            else:
+                ecc = 0.0
+            
+            # Estimate FWHM from region size
+            area = len(coords[0])
+            fwhm = 2 * np.sqrt(area / np.pi)
+            
+            if 2 < fwhm < 50:  # Reasonable star size
+                fwhm_values.append(fwhm)
                 eccentricities.append(ecc)
         
         if not eccentricities:
             return 'unknown', 0.0, 0.0
         
+        avg_fwhm = np.median(fwhm_values)
         avg_ecc = np.median(eccentricities)
-        avg_fwhm = 3.0  # Placeholder
         
-        if avg_ecc > self.eccentricity_threshold * 1.5:
+        # Determine quality
+        if avg_fwhm > self.fwhm_threshold * 1.5 or avg_ecc > self.eccentricity_threshold * 1.5:
             quality = 'poor'
-        elif avg_ecc > self.eccentricity_threshold:
+        elif avg_fwhm > self.fwhm_threshold or avg_ecc > self.eccentricity_threshold:
             quality = 'fair'
         else:
             quality = 'good'

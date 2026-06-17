@@ -43,3 +43,7 @@ Thumbs.db
 # Application specific
 location_tags.json
 *.log
+
+# Debug/temp scripts
+debug/
+*.png
