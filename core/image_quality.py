@@ -237,11 +237,11 @@ class ImageQualityAnalyzer:
         # Strong gradient threshold - use percentage of max to catch spread-out high gradients
         grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
         
-        # Use 40% of max gradient as threshold
+        # Use 35% of max gradient as threshold
         # This catches streaks which create many moderately-high gradient pixels
         # while stars create fewer but higher peak gradients
         max_grad = np.max(grad_magnitude)
-        strong_threshold = max_grad * 0.4
+        strong_threshold = max_grad * 0.35
         
         # Count strong gradient pixels
         strong_pixels = np.sum(grad_magnitude > strong_threshold)
@@ -252,10 +252,10 @@ class ImageQualityAnalyzer:
         strong_ratio = strong_pixels / total_pixels
         
         # Detect streaks: high gradient pixels suggest linear features
-        # From measurements: bad ~0.0124%, good ~0.0061% at 40% threshold
-        # Base threshold at 0.01% (0.0001), adjusted by sensitivity
+        # From measurements at 35%: bad ~0.008-0.012%, good ~0.005-0.006%
+        # Base threshold at 0.006% (0.00006), adjusted by sensitivity
         # sensitivity < 1 = stricter (higher threshold), > 1 = more lenient
-        base_threshold = 0.0001
+        base_threshold = 0.00006
         adjusted_threshold = base_threshold / self.streak_sensitivity
         has_streaks = strong_ratio > adjusted_threshold
         streak_count = max(1, int(strong_ratio * 10000))  # Scale to approximate streak count
