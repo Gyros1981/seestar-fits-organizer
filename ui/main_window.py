@@ -35,6 +35,8 @@ class SeestarApp(ctk.CTk):
         self.raw_dir = None
         self.projects_dir = None
         self.analyze_projects_dir = None
+        self.ps_source_dir = None
+        self.ps_target_dir = None
         self.projects = []
         
         # Workflow configuration
@@ -491,7 +493,11 @@ class SeestarApp(ctk.CTk):
     
     def select_seestar_dir(self):
         """Select Seestar device directory."""
-        directory = filedialog.askdirectory(title="Select Seestar MyWork Directory")
+        initial_dir = self.seestar_dir if self.seestar_dir and self.seestar_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Seestar MyWork Directory",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.seestar_dir = Path(directory)
             self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
@@ -501,7 +507,11 @@ class SeestarApp(ctk.CTk):
     
     def select_raw_dir(self):
         """Select raw directory (target for copy)."""
-        directory = filedialog.askdirectory(title="Select Raw Directory (Target)")
+        initial_dir = self.raw_dir if self.raw_dir and self.raw_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Raw Directory (Target)",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.raw_dir = Path(directory)
             self.raw_path_label.configure(text=str(self.raw_dir), text_color="white")
@@ -511,7 +521,11 @@ class SeestarApp(ctk.CTk):
     
     def select_projects_dir(self):
         """Select projects directory."""
-        directory = filedialog.askdirectory(title="Select Projects Directory")
+        initial_dir = self.projects_dir if self.projects_dir and self.projects_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Projects Directory",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.projects_dir = Path(directory)
             self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
@@ -521,7 +535,11 @@ class SeestarApp(ctk.CTk):
     
     def select_analyze_projects_dir(self):
         """Select projects directory for analysis."""
-        directory = filedialog.askdirectory(title="Select Projects Directory for Analysis")
+        initial_dir = self.analyze_projects_dir if self.analyze_projects_dir and self.analyze_projects_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Projects Directory for Analysis",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.analyze_projects_dir = Path(directory)
             self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
@@ -531,7 +549,11 @@ class SeestarApp(ctk.CTk):
     
     def select_ps_source_dir(self):
         """Select Seestar MyWorks directory for Planetary & Scenery copy."""
-        directory = filedialog.askdirectory(title="Select Seestar MyWorks Directory")
+        initial_dir = self.ps_source_dir if self.ps_source_dir and self.ps_source_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Seestar MyWorks Directory",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.ps_source_dir = Path(directory)
             self.ps_source_path_label.configure(text=str(self.ps_source_dir), text_color="white")
@@ -539,7 +561,11 @@ class SeestarApp(ctk.CTk):
     
     def select_ps_target_dir(self):
         """Select target directory for Planetary & Scenery copy."""
-        directory = filedialog.askdirectory(title="Select Target Directory for Planetary & Scenery")
+        initial_dir = self.ps_target_dir if self.ps_target_dir and self.ps_target_dir.exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Target Directory for Planetary & Scenery",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.ps_target_dir = Path(directory)
             self.ps_target_path_label.configure(text=str(self.ps_target_dir), text_color="white")
@@ -1454,7 +1480,11 @@ class SeestarApp(ctk.CTk):
     
     def browse_fits_directory(self):
         """Browse for a directory containing FITS files."""
-        directory = filedialog.askdirectory(title="Select Directory with FITS Files")
+        initial_dir = Path(self.current_fits_directory) if self.current_fits_directory and Path(self.current_fits_directory).exists() else Path.home()
+        directory = filedialog.askdirectory(
+            title="Select Directory with FITS Files",
+            initialdir=str(initial_dir)
+        )
         if directory:
             self.load_fits_directory(directory)
     
