@@ -55,12 +55,25 @@ class QualityReport:
 class ImageQualityAnalyzer:
     """Analyzes FITS images for quality issues."""
     
+    # --- Streak detection tuning constants ---
+    # Base "strong-gradient" pixel ratio above which an image is considered to
+    # contain a streak. Divided by streak_sensitivity at runtime.
+    STREAK_BASE_THRESHOLD = 0.00006
+    # Fraction of the max gradient magnitude treated as a "strong" gradient pixel.
+    STREAK_GRADIENT_PEAK_FRACTION = 0.35
+    # Scales the raw strong-gradient ratio into an approximate streak count.
+    STREAK_COUNT_SCALE = 10000
+    # Scales the raw strong-gradient ratio into a 0..1 confidence value.
+    STREAK_CONFIDENCE_SCALE = 1000
+    # Default background-gradient threshold for "even" illumination (0..1).
+    DEFAULT_GRADIENT_THRESHOLD = 0.3
+    
     def __init__(self, 
                  streak_sensitivity: float = 1.0,
                  min_streak_length: int = 50,
                  fwhm_threshold: float = 5.0,
                  eccentricity_threshold: float = 0.5,
-                 gradient_threshold: float = 0.3):
+                 gradient_threshold: float = DEFAULT_GRADIENT_THRESHOLD):
         """
         Initialize analyzer with detection thresholds.
         
@@ -252,7 +265,7 @@ class ImageQualityAnalyzer:
         # This catches streaks which create many moderately-high gradient pixels
         # while stars create fewer but higher peak gradients
         max_grad = np.max(grad_magnitude)
-        strong_threshold = max_grad * 0.35
+        strong_threshold = max_grad * self.STREAK_GRADIENT_PEAK_FRACTION
         
         # Count strong gradient pixels
         strong_pixels = np.sum(grad_magnitude > strong_threshold)
@@ -264,18 +277,31 @@ class ImageQualityAnalyzer:
         
         # Detect streaks: high gradient pixels suggest linear features
         # From measurements at 35%: bad ~0.008-0.012%, good ~0.005-0.006%
-        # Base threshold at 0.006% (0.00006), adjusted by sensitivity
-        # sensitivity < 1 = stricter (higher threshold), > 1 = more lenient
-        base_threshold = 0.00006
-        adjusted_threshold = base_threshold / self.streak_sensitivity
-        has_streaks = strong_ratio > adjusted_threshold
-        streak_count = max(1, int(strong_ratio * 10000))  # Scale to approximate streak count
-        confidence = min(1.0, strong_ratio * 1000)  # Scale confidence
+        has_streaks, streak_count, confidence = self._evaluate_streak_ratio(strong_ratio)
         
         logger.debug(f"Streak detection: strong_pixels={strong_pixels}, ratio={strong_ratio:.4f}, "
                      f"has_streaks={has_streaks}, confidence={confidence:.2f}")
         
         return has_streaks, streak_count, confidence, strong_ratio
+    
+    def _evaluate_streak_ratio(self, raw_ratio: float) -> Tuple[bool, int, float]:
+        """Apply the current sensitivity threshold to a raw strong-gradient ratio.
+        
+        Centralizes the streak threshold/scaling math so detection and
+        re-thresholding stay in sync.
+        
+        Returns:
+            (has_streaks, streak_count, confidence)
+        """
+        adjusted_threshold = self.STREAK_BASE_THRESHOLD / self.streak_sensitivity
+        has_streaks = raw_ratio > adjusted_threshold
+        if has_streaks:
+            streak_count = max(1, int(raw_ratio * self.STREAK_COUNT_SCALE))
+            confidence = min(1.0, raw_ratio * self.STREAK_CONFIDENCE_SCALE)
+        else:
+            streak_count = 0
+            confidence = 0.0
+        return has_streaks, streak_count, confidence
     
     def _analyze_star_shapes(self, image: np.ndarray) -> Tuple[str, float, float]:
         """
@@ -510,15 +536,8 @@ class ImageQualityAnalyzer:
             # No cached ratio, can't re-apply
             return report
         
-        # Calculate adjusted threshold based on sensitivity
-        base_threshold = 0.00006
-        adjusted_threshold = base_threshold / self.streak_sensitivity
-        
-        # Re-evaluate streak detection
-        raw_ratio = report.raw_streak_ratio
-        has_streaks = raw_ratio > adjusted_threshold
-        streak_count = max(1, int(raw_ratio * 10000)) if has_streaks else 0
-        confidence = min(1.0, raw_ratio * 1000) if has_streaks else 0.0
+        # Re-evaluate streak detection from the cached ratio
+        has_streaks, streak_count, confidence = self._evaluate_streak_ratio(report.raw_streak_ratio)
         
         # Rebuild issues list
         issues = []
@@ -531,8 +550,9 @@ class ImageQualityAnalyzer:
         if report.background_gradient > self.gradient_threshold:
             issues.append("Uneven background illumination")
         
-        # Re-evaluate problematic status
-        is_problematic = has_streaks or report.star_quality == 'poor'
+        # Re-evaluate problematic status (consistent with analyze_image)
+        is_problematic = (has_streaks or report.star_quality == 'poor'
+                          or report.background_gradient > self.gradient_threshold)
         
         # Return updated report
         return QualityReport(

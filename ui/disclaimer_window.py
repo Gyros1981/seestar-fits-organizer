@@ -8,6 +8,8 @@ import customtkinter as ctk
 from pathlib import Path
 import logging
 
+from ui.theme import INFO, INFO_HOVER
+
 logger = logging.getLogger(__name__)
 
 
@@ -110,8 +112,8 @@ class DisclaimerWindow(ctk.CTkToplevel):
             text="Continue to App",
             font=self.get_font(14, weight="bold"),
             height=40,
-            fg_color="#1E90FF",
-            hover_color="#4169E1",
+            fg_color=INFO,
+            hover_color=INFO_HOVER,
             command=self.continue_to_app
         )
         continue_button.pack(side="right", fill="x", expand=True, padx=(5, 0))

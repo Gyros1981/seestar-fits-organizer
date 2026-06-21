@@ -10,6 +10,8 @@ from tkinter import filedialog, messagebox
 import json
 import logging
 
+from ui.theme import INFO, INFO_HOVER
+
 logger = logging.getLogger(__name__)
 
 
@@ -235,8 +237,8 @@ class SettingsWindow(ctk.CTkToplevel):
         save_button = ctk.CTkButton(
             action_frame,
             text="Save",
-            fg_color="#1E90FF",
-            hover_color="#4169E1",
+            fg_color=INFO,
+            hover_color=INFO_HOVER,
             command=self.save_settings,
             height=40
         )

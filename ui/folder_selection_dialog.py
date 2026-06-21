@@ -8,6 +8,8 @@ import customtkinter as ctk
 from pathlib import Path
 from typing import List
 
+from ui.theme import INFO, INFO_HOVER
+
 
 class FolderSelectionWindow(ctk.CTkToplevel):
     """
@@ -130,8 +132,8 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             text="Process Selected",
             command=self.process,
             height=40,
-            fg_color="#1E90FF",
-            hover_color="#4169E1"
+            fg_color=INFO,
+            hover_color=INFO_HOVER
         )
         process_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
     

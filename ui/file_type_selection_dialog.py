@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, Set, List
 import logging
 
+from ui.theme import DANGER, DANGER_HOVER
+
 logger = logging.getLogger(__name__)
 
 
@@ -113,8 +115,8 @@ class FileTypeSelectionDialog(ctk.CTkToplevel):
             button_frame,
             text="Cancel",
             width=100,
-            fg_color="#C0392B",
-            hover_color="#A93226",
+            fg_color=DANGER,
+            hover_color=DANGER_HOVER,
             command=self._cancel
         )
         cancel_btn.pack(side="right", padx=5)

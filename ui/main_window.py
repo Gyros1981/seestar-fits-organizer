@@ -24,6 +24,11 @@ from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
 
 # Import UI components
 from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow, FileTypeSelectionDialog, detect_file_types_in_directories
+from ui.theme import (
+    ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
+    NEUTRAL, NEUTRAL_HOVER, TOOLTIP_BG, SEPARATOR_GRAY, SEPARATOR_HOVER,
+    SURFACE_DARK, SELECT_BG, TEXT_LIGHT, TEXT_MUTED, TEXT_DIM, TEXT_FAINT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +130,7 @@ class SeestarApp(ctk.CTk):
             font=font,
             height=28,
             fg_color="transparent",
-            hover_color="#D35400",
+            hover_color=ACCENT_HOVER,
             border_width=0,
             text_color="black",
             cursor="hand2",
@@ -148,8 +153,8 @@ class SeestarApp(ctk.CTk):
             text=text,
             font=self.get_font(12),
             height=28,
-            fg_color="#E67E22",
-            hover_color="#D35400",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             border_width=0,
             text_color="black",
             anchor="w",
@@ -163,7 +168,7 @@ class SeestarApp(ctk.CTk):
         Args:
             parent: Parent widget
         """
-        separator = ctk.CTkFrame(parent, height=1, fg_color="#D35400")
+        separator = ctk.CTkFrame(parent, height=1, fg_color=ACCENT_HOVER)
         separator.pack(fill="x", padx=5, pady=2)
     
     def get_font(self, size: int, weight: str = None):
@@ -248,7 +253,7 @@ class SeestarApp(ctk.CTk):
             self,
             text=text,
             font=self.get_font(10),
-            fg_color="#2C3E50",
+            fg_color=TOOLTIP_BG,
             text_color="white",
             corner_radius=5,
             padx=8,
@@ -284,7 +289,7 @@ class SeestarApp(ctk.CTk):
         main_frame.grid_rowconfigure(1, weight=1)  # Content frame expands
         
         # Menu bar frame at top (fixed height)
-        menu_bar = ctk.CTkFrame(main_frame, height=35, fg_color="#E67E22")
+        menu_bar = ctk.CTkFrame(main_frame, height=35, fg_color=ACCENT)
         menu_bar.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         menu_bar.grid_propagate(False)  # Keep fixed height
         
@@ -296,7 +301,7 @@ class SeestarApp(ctk.CTk):
             width=35,
             height=28,
             fg_color="transparent",
-            hover_color="#D35400",
+            hover_color=ACCENT_HOVER,
             border_width=0,
             text_color="black",
             command=lambda: (self.destroy_all_menus(), self.show_mode('welcome'))
@@ -345,7 +350,7 @@ class SeestarApp(ctk.CTk):
             width=35,
             height=28,
             fg_color="transparent",
-            hover_color="#D35400",
+            hover_color=ACCENT_HOVER,
             border_width=0,
             text_color="black",
             command=lambda: (self.destroy_all_menus(), self.show_mode('settings'))
@@ -369,7 +374,7 @@ class SeestarApp(ctk.CTk):
         self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 0))
         
         # Resizable separator with toggle button
-        self.separator = ctk.CTkFrame(self.content_frame, width=12, fg_color="#3a3a3a", cursor="sb_h_double_arrow")
+        self.separator = ctk.CTkFrame(self.content_frame, width=12, fg_color=SEPARATOR_GRAY, cursor="sb_h_double_arrow")
         self.separator.grid(row=0, column=1, sticky="ns")
         
         # Console toggle button on separator
@@ -379,8 +384,8 @@ class SeestarApp(ctk.CTk):
             width=24,
             height=36,
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#3a3a3a",
-            hover_color="#555555",
+            fg_color=SEPARATOR_GRAY,
+            hover_color=SEPARATOR_HOVER,
             text_color="white",
             command=self.toggle_console
         )
@@ -433,7 +438,7 @@ class SeestarApp(ctk.CTk):
         self.progress_frame = ctk.CTkFrame(self.left_panel)
         self.progress_frame.pack(fill="x", side="bottom", pady=(10, 0))
         
-        self.progress_label = ctk.CTkLabel(self.progress_frame, text="Ready", text_color="#E0E0E0")
+        self.progress_label = ctk.CTkLabel(self.progress_frame, text="Ready", text_color=TEXT_LIGHT)
         self.progress_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         # Progress bar for file operations
@@ -1015,7 +1020,7 @@ class SeestarApp(ctk.CTk):
             self.scan_build_frame,
             text="Copy FITS files directly from Seestar device to project folders. This mode skips the intermediate Raw directory.",
             font=self.get_font(13),
-            text_color="#B0B0B0",
+            text_color=TEXT_MUTED,
             wraplength=900,
             justify="left"
         )
@@ -1028,10 +1033,10 @@ class SeestarApp(ctk.CTk):
         seestar_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
         seestar_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
-        self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.seestar_path_label = ctk.CTkLabel(seestar_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.seestar_path_label.pack(side="left", padx=(0, 10))
         
-        self.seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.seestar_button = ctk.CTkButton(seestar_button_frame, text="🌌 Browse", command=self.select_seestar_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.seestar_button.pack(side="right")
         
         # Raw Directory Section (hidden initially)
@@ -1043,10 +1048,10 @@ class SeestarApp(ctk.CTk):
         raw_button_frame = ctk.CTkFrame(self.raw_section_frame, fg_color="transparent")
         raw_button_frame.pack(fill="x", pady=(5, 10))
         
-        self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.raw_path_label = ctk.CTkLabel(raw_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.raw_path_label.pack(side="left", padx=(0, 10))
         
-        self.raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.raw_button = ctk.CTkButton(raw_button_frame, text="🌌 Browse", command=self.select_raw_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.raw_button.pack(side="right")
         
         # Projects Directory
@@ -1056,10 +1061,10 @@ class SeestarApp(ctk.CTk):
         projects_button_frame = ctk.CTkFrame(self.scan_build_frame, fg_color="transparent")
         projects_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
-        self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.projects_path_label = ctk.CTkLabel(projects_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.projects_path_label.pack(side="left", padx=(0, 10))
         
-        self.projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.projects_button = ctk.CTkButton(projects_button_frame, text="🌌 Browse", command=self.select_projects_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.projects_button.pack(side="right")
         
         # Start Button
@@ -1069,8 +1074,8 @@ class SeestarApp(ctk.CTk):
             command=self.start_scan,
             height=40,
             font=self.get_font(14, weight="bold"),
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.scan_build_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
@@ -1088,10 +1093,10 @@ class SeestarApp(ctk.CTk):
         analyze_projects_button_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
         analyze_projects_button_frame.pack(fill="x", padx=10, pady=(0, 10))
         
-        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
         
-        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.analyze_projects_button.pack(side="right")
         
         # Start Button
@@ -1101,8 +1106,8 @@ class SeestarApp(ctk.CTk):
             command=self.start_analysis,
             height=40,
             font=self.get_font(14, weight="bold"),
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.analyze_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
@@ -1124,7 +1129,7 @@ class SeestarApp(ctk.CTk):
                  "• Scenery_video, Scenery_photo\n\n"
                  "Files are only copied if they don't already exist at the destination (matching file size).",
             font=self.get_font(13),
-            text_color="#B0B0B0",
+            text_color=TEXT_MUTED,
             wraplength=900,
             justify="left"
         )
@@ -1137,10 +1142,10 @@ class SeestarApp(ctk.CTk):
         source_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
         source_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
-        self.ps_source_path_label = ctk.CTkLabel(source_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.ps_source_path_label = ctk.CTkLabel(source_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.ps_source_path_label.pack(side="left", padx=(0, 10))
         
-        self.ps_source_button = ctk.CTkButton(source_button_frame, text="🌌 Browse", command=self.select_ps_source_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.ps_source_button = ctk.CTkButton(source_button_frame, text="🌌 Browse", command=self.select_ps_source_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.ps_source_button.pack(side="right")
         
         # Target: Destination Directory
@@ -1150,10 +1155,10 @@ class SeestarApp(ctk.CTk):
         target_button_frame = ctk.CTkFrame(self.planetary_scenery_frame, fg_color="transparent")
         target_button_frame.pack(fill="x", padx=10, pady=(5, 10))
         
-        self.ps_target_path_label = ctk.CTkLabel(target_button_frame, text="Not selected", text_color="#B0B0B0")
+        self.ps_target_path_label = ctk.CTkLabel(target_button_frame, text="Not selected", text_color=TEXT_MUTED)
         self.ps_target_path_label.pack(side="left", padx=(0, 10))
         
-        self.ps_target_button = ctk.CTkButton(target_button_frame, text="🌌 Browse", command=self.select_ps_target_dir, width=100, fg_color="#3498db", hover_color="#2980b9")
+        self.ps_target_button = ctk.CTkButton(target_button_frame, text="🌌 Browse", command=self.select_ps_target_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
         self.ps_target_button.pack(side="right")
         
         # Start Button
@@ -1163,8 +1168,8 @@ class SeestarApp(ctk.CTk):
             command=self.start_planetary_scenery_copy,
             height=40,
             font=self.get_font(14, weight="bold"),
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.ps_action_btn.pack(fill="x", padx=10, pady=(10, 10))
     
@@ -1180,7 +1185,7 @@ class SeestarApp(ctk.CTk):
         dir_frame = ctk.CTkFrame(self.fits_viewer_frame)
         dir_frame.pack(fill="x", padx=10, pady=(0, 5))
         
-        self.fits_viewer_dir_label = ctk.CTkLabel(dir_frame, text="No directory selected", text_color="#B0B0B0")
+        self.fits_viewer_dir_label = ctk.CTkLabel(dir_frame, text="No directory selected", text_color=TEXT_MUTED)
         self.fits_viewer_dir_label.pack(side="left", padx=10, pady=10)
         
         self.browse_fits_btn = ctk.CTkButton(
@@ -1190,8 +1195,8 @@ class SeestarApp(ctk.CTk):
             width=100,
             font=self.get_font(11),
             text_color="black",
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.browse_fits_btn.pack(side="right", padx=10, pady=10)
         
@@ -1210,14 +1215,14 @@ class SeestarApp(ctk.CTk):
         list_label.pack(anchor="w", padx=10, pady=(5, 0))
         
         # Hint label above buttons
-        hint_label = ctk.CTkLabel(left_panel, text="💡 Double-click file to mark/unmark", font=self.get_font(9), text_color="#808080")
+        hint_label = ctk.CTkLabel(left_panel, text="💡 Double-click file to mark/unmark", font=self.get_font(9), text_color=TEXT_FAINT)
         hint_label.pack(anchor="w", padx=10, pady=(5, 0))
         
         # Marked files controls
         marks_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
         marks_frame.pack(fill="x", padx=5, pady=5)
         
-        marks_label = ctk.CTkLabel(marks_frame, text="Marked Files:", font=self.get_font(9), text_color="#A0A0A0")
+        marks_label = ctk.CTkLabel(marks_frame, text="Marked Files:", font=self.get_font(9), text_color=TEXT_DIM)
         marks_label.pack(side="left", padx=(0, 5))
         
         self.clear_marks_btn = ctk.CTkButton(
@@ -1227,8 +1232,8 @@ class SeestarApp(ctk.CTk):
             width=80, 
             font=self.get_font(10),
             text_color="black",
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.clear_marks_btn.pack(side="left", padx=2)
         
@@ -1239,20 +1244,20 @@ class SeestarApp(ctk.CTk):
             width=100, 
             font=self.get_font(10),
             text_color="white",
-            fg_color="#C0392B",
-            hover_color="#A93226"
+            fg_color=DANGER,
+            hover_color=DANGER_HOVER
         )
         self.delete_marked_btn.pack(side="left", padx=8)
         
         # Separator line
-        separator = ctk.CTkFrame(left_panel, height=2, fg_color="#555555")
+        separator = ctk.CTkFrame(left_panel, height=2, fg_color=SEPARATOR_HOVER)
         separator.pack(fill="x", padx=10, pady=5)
         
         # Analysis controls
         analysis_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
         analysis_frame.pack(fill="x", padx=5, pady=5)
         
-        analysis_label = ctk.CTkLabel(analysis_frame, text="Analysis:", font=self.get_font(9), text_color="#A0A0A0")
+        analysis_label = ctk.CTkLabel(analysis_frame, text="Analysis:", font=self.get_font(9), text_color=TEXT_DIM)
         analysis_label.pack(anchor="w", padx=2)
         
         # Analyze row
@@ -1266,8 +1271,8 @@ class SeestarApp(ctk.CTk):
             width=90, 
             font=self.get_font(10),
             text_color="black",
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.analyze_all_btn.pack(side="left", padx=2)
         
@@ -1278,20 +1283,33 @@ class SeestarApp(ctk.CTk):
             width=100, 
             font=self.get_font(10),
             text_color="black",
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.auto_mark_btn.pack(side="left", padx=8)
         
+        # Analysis Report button (hidden until an analysis has completed)
+        self.analysis_report_btn = ctk.CTkButton(
+            analyze_row,
+            text="Analysis Report",
+            command=self.show_analysis_report,
+            width=110,
+            font=self.get_font(10),
+            text_color="black",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
+        )
+        # Not packed initially; shown in _analysis_complete
+        
         # Progress label
-        self.analysis_progress_label = ctk.CTkLabel(analyze_row, text="", font=self.get_font(10), text_color="#B0B0B0")
+        self.analysis_progress_label = ctk.CTkLabel(analyze_row, text="", font=self.get_font(10), text_color=TEXT_MUTED)
         self.analysis_progress_label.pack(side="left", padx=5)
         
         # Sensitivity row
         sensi_row = ctk.CTkFrame(analysis_frame, fg_color="transparent")
         sensi_row.pack(fill="x", pady=(5, 0))
         
-        sensi_label = ctk.CTkLabel(sensi_row, text="Threshold:", font=self.get_font(9), text_color="#A0A0A0")
+        sensi_label = ctk.CTkLabel(sensi_row, text="Threshold:", font=self.get_font(9), text_color=TEXT_DIM)
         sensi_label.pack(side="left", padx=2)
         
         self.sensitivity_label = ctk.CTkLabel(
@@ -1325,9 +1343,9 @@ class SeestarApp(ctk.CTk):
             list_frame,
             selectmode="single",
             font=("Segoe UI", 11),
-            bg="#2B2B2B",
+            bg=SURFACE_DARK,
             fg="white",
-            selectbackground="#1E90FF",
+            selectbackground=SELECT_BG,
             selectforeground="white",
             borderwidth=0,
             highlightthickness=0,
@@ -1345,6 +1363,9 @@ class SeestarApp(ctk.CTk):
         # Bind double-click to toggle mark
         self.fits_file_listbox.bind('<Double-Button-1>', self._on_listbox_double_click)
         
+        # Bind right-click to show per-file quality details
+        self.fits_file_listbox.bind('<Button-3>', self._on_listbox_right_click)
+        
         # Right panel - preview with zoom controls
         right_panel = ctk.CTkFrame(content_frame)
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
@@ -1356,7 +1377,7 @@ class SeestarApp(ctk.CTk):
         preview_label.grid(row=0, column=0, sticky="w", padx=10, pady=(5, 0))
         
         # Filename label (updates when file selected)
-        self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=self.get_font(11), text_color="#B0B0B0")
+        self.fits_preview_filename = ctk.CTkLabel(right_panel, text="", font=self.get_font(11), text_color=TEXT_MUTED)
         self.fits_preview_filename.grid(row=0, column=0, sticky="w", padx=10, pady=(25, 5))
         
         # Preview image container
@@ -1365,7 +1386,7 @@ class SeestarApp(ctk.CTk):
         preview_container.grid_columnconfigure(0, weight=1)
         preview_container.grid_rowconfigure(0, weight=1)
         
-        self.fits_preview_label = ctk.CTkLabel(preview_container, text="Select a FITS file to preview", text_color="#B0B0B0")
+        self.fits_preview_label = ctk.CTkLabel(preview_container, text="Select a FITS file to preview", text_color=TEXT_MUTED)
         self.fits_preview_label.grid(row=0, column=0, sticky="nsew")
         
         # Zoom buttons on the right
@@ -1380,8 +1401,8 @@ class SeestarApp(ctk.CTk):
             font=self.get_font(14),
             text_color="black",
             command=self.zoom_fits_in,
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.zoom_in_btn.pack(pady=(0, 5))
         self._create_tooltip(self.zoom_in_btn, "Zoom In")
@@ -1404,8 +1425,8 @@ class SeestarApp(ctk.CTk):
             font=self.get_font(14),
             text_color="black",
             command=self.zoom_fits_out,
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.zoom_out_btn.pack(pady=(5, 0))
         self._create_tooltip(self.zoom_out_btn, "Zoom Out")
@@ -1421,8 +1442,8 @@ class SeestarApp(ctk.CTk):
             font=self.get_font(10),
             text_color="black",
             command=lambda: self.navigate_fits_files(-1),
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.prev_btn.pack(side="left", padx=2)
         self._create_tooltip(self.prev_btn, "Previous Image")
@@ -1434,14 +1455,14 @@ class SeestarApp(ctk.CTk):
             font=self.get_font(10),
             text_color="black",
             command=lambda: self.navigate_fits_files(1),
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER
         )
         self.next_btn.pack(side="right", padx=2)
         self._create_tooltip(self.next_btn, "Next Image")
         
         # Status bar
-        self.fits_status_label = ctk.CTkLabel(self.fits_viewer_frame, text="Ready", text_color="#E0E0E0")
+        self.fits_status_label = ctk.CTkLabel(self.fits_viewer_frame, text="Ready", text_color=TEXT_LIGHT)
         self.fits_status_label.pack(anchor="w", padx=10, pady=(0, 5))
         
         # Bind keyboard navigation
@@ -1475,6 +1496,10 @@ class SeestarApp(ctk.CTk):
         self._update_zoom_display()
         self.fits_preview_label.configure(text="Select a FITS file to preview", image=None)
         self.analysis_progress_label.configure(text="")
+        
+        # Hide the Analysis Report button until a new analysis completes
+        if hasattr(self, 'analysis_report_btn') and self.analysis_report_btn.winfo_ismapped():
+            self.analysis_report_btn.pack_forget()
         
         self.current_fits_directory = directory
         self.fits_viewer_dir_label.configure(text=directory)
@@ -1645,7 +1670,7 @@ class SeestarApp(ctk.CTk):
         entry.focus()
         
         # Help text
-        help_label = ctk.CTkLabel(dialog, text="Range: 30% - 250%", font=self.get_font(10), text_color="#B0B0B0")
+        help_label = ctk.CTkLabel(dialog, text="Range: 30% - 250%", font=self.get_font(10), text_color=TEXT_MUTED)
         help_label.pack(pady=(0, 10))
         
         def apply_zoom():
@@ -1672,10 +1697,10 @@ class SeestarApp(ctk.CTk):
         btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_frame.pack(pady=10)
         
-        cancel_btn = ctk.CTkButton(btn_frame, text="Cancel", width=80, command=dialog.destroy, fg_color="#7F8C8D", hover_color="#616A6B")
+        cancel_btn = ctk.CTkButton(btn_frame, text="Cancel", width=80, command=dialog.destroy, fg_color=NEUTRAL, hover_color=NEUTRAL_HOVER)
         cancel_btn.pack(side="left", padx=5)
         
-        ok_btn = ctk.CTkButton(btn_frame, text="OK", width=80, command=apply_zoom, fg_color="#E67E22", hover_color="#D35400")
+        ok_btn = ctk.CTkButton(btn_frame, text="OK", width=80, command=apply_zoom, fg_color=ACCENT, hover_color=ACCENT_HOVER)
         ok_btn.pack(side="left", padx=5)
     
     def _update_nav_buttons(self):
@@ -1708,6 +1733,19 @@ class SeestarApp(ctk.CTk):
             self.selected_fits_index = index
             # Toggle mark
             self.toggle_mark_selected()
+    
+    def _on_listbox_right_click(self, event):
+        """Handle right-click to show quality details for the clicked item."""
+        index = self.fits_file_listbox.nearest(event.y)
+        if index >= 0 and index < len(self.fits_files):
+            # Select the clicked item and update preview/state
+            self.fits_file_listbox.selection_clear(0, "end")
+            self.fits_file_listbox.selection_set(index)
+            self.selected_fits_index = index
+            self.show_fits_preview(self.fits_files[index])
+            self._update_nav_buttons()
+            # Show its quality details
+            self.show_quality_details()
     
     def toggle_mark_selected(self):
         """Toggle mark for deletion on currently selected file."""
@@ -1947,7 +1985,7 @@ class SeestarApp(ctk.CTk):
         state = "normal" if enabled else "disabled"
         widget_names = [
             'browse_fits_btn', 'analyze_all_btn', 'auto_mark_btn',
-            'delete_marked_btn', 'clear_marks_btn',
+            'delete_marked_btn', 'clear_marks_btn', 'analysis_report_btn',
             'zoom_in_btn', 'zoom_out_btn', 'prev_btn', 'next_btn',
             'sensitivity_slider',
         ]
@@ -2047,6 +2085,10 @@ class SeestarApp(ctk.CTk):
         
         self.analysis_progress_label.configure(text=f"Done: {problematic}/{total} problematic")
         
+        # Reveal the Analysis Report button now that results exist
+        if not self.analysis_report_btn.winfo_ismapped():
+            self.analysis_report_btn.pack(side="left", padx=8, before=self.analysis_progress_label)
+        
         # Refresh list to show indicators
         self.refresh_fits_file_list()
         
@@ -2097,9 +2139,14 @@ class SeestarApp(ctk.CTk):
     def show_quality_details(self):
         """Show quality details for the currently selected image."""
         if self.selected_fits_index < 0:
+            messagebox.showinfo("No Selection", "Select a file first to view its quality details.")
             return
         
         if self.selected_fits_index not in self.quality_reports:
+            messagebox.showinfo(
+                "Not Analyzed",
+                "This file hasn't been analyzed yet.\n\nClick 'Analyze All' to generate quality reports."
+            )
             return
         
         report = self.quality_reports[self.selected_fits_index]
@@ -2116,7 +2163,8 @@ class SeestarApp(ctk.CTk):
         details += f"   Average FWHM: {report.avg_fwhm:.2f} pixels\n"
         details += f"   Eccentricity: {report.avg_eccentricity:.2f}\n"
         
-        if report.background_gradient > 0.3:
+        from core.image_quality import ImageQualityAnalyzer
+        if report.background_gradient > ImageQualityAnalyzer.DEFAULT_GRADIENT_THRESHOLD:
             details += f"\n⚠️ Uneven background (gradient: {report.background_gradient:.2f})\n"
         
         if report.issues:
@@ -2138,6 +2186,77 @@ class SeestarApp(ctk.CTk):
         textbox = ctk.CTkTextbox(dialog, wrap="word")
         textbox.pack(fill="both", expand=True, padx=10, pady=10)
         textbox.insert("1.0", details)
+        textbox.configure(state="disabled")
+        
+        close_btn = ctk.CTkButton(dialog, text="Close", command=dialog.destroy)
+        close_btn.pack(pady=10)
+
+    def show_analysis_report(self):
+        """Show an aggregate quality report for the whole analyzed folder."""
+        if not self.quality_reports:
+            messagebox.showinfo(
+                "No Analysis",
+                "No analysis results yet.\n\nClick 'Analyze All' to generate a report."
+            )
+            return
+        
+        from core.image_quality import ImageQualityAnalyzer
+        gradient_threshold = ImageQualityAnalyzer.DEFAULT_GRADIENT_THRESHOLD
+        
+        reports = list(self.quality_reports.values())
+        total = len(reports)
+        with_streaks = sum(1 for r in reports if r.has_streaks)
+        poor_stars = sum(1 for r in reports if r.star_quality == 'poor')
+        fair_stars = sum(1 for r in reports if r.star_quality == 'fair')
+        uneven_bg = sum(1 for r in reports if r.background_gradient > gradient_threshold)
+        problematic = sum(1 for r in reports if r.is_problematic)
+        good = total - problematic
+        marked = len(self.marked_for_deletion)
+        
+        def pct(n):
+            return f"{(n / total * 100):.0f}%" if total else "0%"
+        
+        # Map sensitivity value to label (matches slider semantics)
+        sens = self.current_sensitivity
+        if sens <= 0.35:
+            sens_label = "Strict"
+        elif sens >= 0.65:
+            sens_label = "Lenient"
+        else:
+            sens_label = "Balanced"
+        
+        lines = []
+        lines.append("ANALYSIS REPORT")
+        lines.append("=" * 40)
+        lines.append(f"Folder: {self.current_fits_directory or 'unknown'}")
+        lines.append(f"Sensitivity: {sens_label} ({sens:.2f})")
+        lines.append("")
+        lines.append(f"Images analyzed: {total}")
+        lines.append("")
+        lines.append("ISSUES")
+        lines.append("-" * 40)
+        lines.append(f"🛰️ Satellite/airplane streaks: {with_streaks} ({pct(with_streaks)})")
+        lines.append(f"⭐ Poor star quality:          {poor_stars} ({pct(poor_stars)})")
+        lines.append(f"~  Fair star quality:          {fair_stars} ({pct(fair_stars)})")
+        lines.append(f"⚠️ Uneven background:          {uneven_bg} ({pct(uneven_bg)})")
+        lines.append("")
+        lines.append("SUMMARY")
+        lines.append("-" * 40)
+        lines.append(f"✓ Good images:        {good} ({pct(good)})")
+        lines.append(f"⚠️ Flagged problematic: {problematic} ({pct(problematic)})")
+        lines.append(f"🗑️ Currently marked:   {marked}")
+        
+        report_text = "\n".join(lines)
+        
+        # Show in dialog
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Analysis Report")
+        dialog.geometry("460x460")
+        dialog.transient(self)
+        
+        textbox = ctk.CTkTextbox(dialog, wrap="word", font=("Consolas", 12))
+        textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        textbox.insert("1.0", report_text)
         textbox.configure(state="disabled")
         
         close_btn = ctk.CTkButton(dialog, text="Close", command=dialog.destroy)
@@ -2312,8 +2431,8 @@ class SeestarApp(ctk.CTk):
             text="↺ Reset to Defaults",
             command=self.reset_settings_to_defaults,
             height=40,
-            fg_color="#7F8C8D",
-            hover_color="#616A6B",
+            fg_color=NEUTRAL,
+            hover_color=NEUTRAL_HOVER,
             font=self.get_font(12)
         )
         reset_button.grid(row=0, column=0, padx=(0, 10), sticky="ew")
@@ -2324,8 +2443,8 @@ class SeestarApp(ctk.CTk):
             text="💾 Save Settings",
             command=self.save_main_settings,
             height=40,
-            fg_color="#E67E22",
-            hover_color="#D35400",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             font=self.get_font(14, weight="bold")
         )
         save_button.grid(row=0, column=1, padx=(10, 0), sticky="ew")
@@ -2672,7 +2791,7 @@ class SeestarApp(ctk.CTk):
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#E67E22")  # Match menu bar background
+        menu.configure(fg_color=ACCENT)  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_import_menu') and self._import_menu and self._import_menu.winfo_exists():
@@ -2725,7 +2844,7 @@ class SeestarApp(ctk.CTk):
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#E67E22")  # Match menu bar background
+        menu.configure(fg_color=ACCENT)  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_tools_menu') and self._tools_menu and self._tools_menu.winfo_exists():
@@ -2768,7 +2887,7 @@ class SeestarApp(ctk.CTk):
         menu.overrideredirect(True)
         menu.transient(self)
         menu.lift()
-        menu.configure(fg_color="#E67E22")  # Match menu bar background
+        menu.configure(fg_color=ACCENT)  # Match menu bar background
         
         def close_menu():
             if hasattr(self, '_help_menu') and self._help_menu and self._help_menu.winfo_exists():
@@ -2812,7 +2931,7 @@ class SeestarApp(ctk.CTk):
                  "Version: 1.4\n"
                  "Created by Guy Ronen",
             font=self.get_font(16),
-            text_color="#B0B0B0",
+            text_color=TEXT_MUTED,
             wraplength=900,
             justify="left"
         )
