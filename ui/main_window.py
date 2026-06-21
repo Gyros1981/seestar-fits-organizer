@@ -12,6 +12,13 @@ import logging
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 
+# Safe deletion to OS Recycle Bin (graceful fallback if unavailable)
+try:
+    from send2trash import send2trash
+    SEND2TRASH_AVAILABLE = True
+except ImportError:
+    SEND2TRASH_AVAILABLE = False
+
 # Import core business logic
 from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
 
@@ -1176,7 +1183,7 @@ class SeestarApp(ctk.CTk):
         self.fits_viewer_dir_label = ctk.CTkLabel(dir_frame, text="No directory selected", text_color="#B0B0B0")
         self.fits_viewer_dir_label.pack(side="left", padx=10, pady=10)
         
-        browse_btn = ctk.CTkButton(
+        self.browse_fits_btn = ctk.CTkButton(
             dir_frame, 
             text="Browse", 
             command=self.browse_fits_directory, 
@@ -1186,7 +1193,7 @@ class SeestarApp(ctk.CTk):
             fg_color="#E67E22",
             hover_color="#D35400"
         )
-        browse_btn.pack(side="right", padx=10, pady=10)
+        self.browse_fits_btn.pack(side="right", padx=10, pady=10)
         
         # Main content - split view
         content_frame = ctk.CTkFrame(self.fits_viewer_frame)
@@ -1728,7 +1735,7 @@ class SeestarApp(ctk.CTk):
     def delete_marked_fits(self):
         """Delete all marked FITS files."""
         if not self.marked_for_deletion:
-            messagebox.showwarning("No Files Marked", "No files marked for deletion. Use 'Mark' button to mark files.")
+            messagebox.showwarning("No Files Marked", "No files marked for deletion. Double-click a file in the list to mark it for deletion.")
             return
         
         marked_indices = sorted(self.marked_for_deletion)
@@ -1743,7 +1750,12 @@ class SeestarApp(ctk.CTk):
         
         msg = f"Delete {count} marked file(s)?\n\n{file_list}"
         
-        if not messagebox.askyesno("Confirm Delete", msg + "\n\nThis action cannot be undone!"):
+        if SEND2TRASH_AVAILABLE:
+            msg += "\n\nFiles will be moved to the Recycle Bin."
+        else:
+            msg += "\n\nWARNING: send2trash is not installed, so files will be PERMANENTLY deleted and cannot be recovered!"
+        
+        if not messagebox.askyesno("Confirm Delete", msg):
             return
         
         # Delete files
@@ -1751,22 +1763,27 @@ class SeestarApp(ctk.CTk):
         failed = 0
         # Delete in reverse order to maintain index validity
         for i in reversed(marked_indices):
+            file_path = self.fits_files[i]
             try:
-                file_path = self.fits_files[i]
-                file_path.unlink()
+                if SEND2TRASH_AVAILABLE:
+                    # Move to Recycle Bin (recoverable). send2trash needs a str path.
+                    send2trash(str(file_path))
+                else:
+                    file_path.unlink()
                 deleted += 1
             except Exception as e:
-                logger.error(f"Failed to delete {self.fits_files[i]}: {e}")
+                logger.error(f"Failed to delete {file_path}: {e}")
                 failed += 1
         
         # Reload directory
         self.load_fits_directory(self.current_fits_directory)
         
         # Show result
+        destination = "moved to Recycle Bin" if SEND2TRASH_AVAILABLE else "deleted"
         if failed == 0:
-            self.fits_status_label.configure(text=f"✓ Deleted {deleted} file(s)")
+            self.fits_status_label.configure(text=f"✓ {deleted} file(s) {destination}")
         else:
-            self.fits_status_label.configure(text=f"Deleted {deleted}, failed {failed}")
+            self.fits_status_label.configure(text=f"{destination.capitalize()} {deleted}, failed {failed}")
     
     def show_fits_preview(self, file_path):
         """Show preview of a FITS file."""
@@ -1923,6 +1940,25 @@ class SeestarApp(ctk.CTk):
         except Exception as e:
             logger.error(f"Error re-applying threshold: {e}")
     
+    def _set_fits_viewer_state(self, enabled: bool):
+        """Enable or disable all FITS viewer controls that mutate the file list
+        or analysis state. Used to lock the panel during background analysis so
+        the index-based quality_reports mapping cannot be corrupted."""
+        state = "normal" if enabled else "disabled"
+        widget_names = [
+            'browse_fits_btn', 'analyze_all_btn', 'auto_mark_btn',
+            'delete_marked_btn', 'clear_marks_btn',
+            'zoom_in_btn', 'zoom_out_btn', 'prev_btn', 'next_btn',
+            'sensitivity_slider',
+        ]
+        for name in widget_names:
+            widget = getattr(self, name, None)
+            if widget is not None:
+                try:
+                    widget.configure(state=state)
+                except Exception as e:
+                    logger.debug(f"Could not set state on {name}: {e}")
+
     def analyze_all_fits(self):
         """Run quality analysis on all FITS files in the current directory."""
         if not self.fits_files:
@@ -1934,7 +1970,7 @@ class SeestarApp(ctk.CTk):
             return
         
         self.analysis_in_progress = True
-        self.analyze_all_btn.configure(state="disabled")
+        self._set_fits_viewer_state(False)
         self.analysis_progress_label.configure(text="Starting analysis...")
         
         # Run analysis in background thread
@@ -2003,7 +2039,7 @@ class SeestarApp(ctk.CTk):
     def _analysis_complete(self):
         """Called when analysis is complete."""
         self.analysis_in_progress = False
-        self.analyze_all_btn.configure(state="normal")
+        self._set_fits_viewer_state(True)
         
         # Count issues
         problematic = sum(1 for r in self.quality_reports.values() if r.is_problematic)
@@ -2024,7 +2060,7 @@ class SeestarApp(ctk.CTk):
                 f"Issues found:\n"
                 f"  🛰️ {streaks} with satellite/airplane streaks\n"
                 f"  ⭐ {poor_stars} with poor star quality\n\n"
-                f"Use '⚠️ Auto-Mark Bad' to mark problematic images for deletion."
+                f"Use 'Auto-Mark Bad' to mark problematic images for deletion."
             )
         else:
             messagebox.showinfo("Analysis Complete", f"Analyzed {total} images. No issues found!")
@@ -2032,7 +2068,7 @@ class SeestarApp(ctk.CTk):
     def _analysis_error(self, error_msg: str):
         """Called when analysis encounters an error."""
         self.analysis_in_progress = False
-        self.analyze_all_btn.configure(state="normal")
+        self._set_fits_viewer_state(True)
         self.analysis_progress_label.configure(text="Analysis failed")
         messagebox.showerror("Analysis Error", f"Failed to analyze images:\n{error_msg}")
     
@@ -2055,7 +2091,7 @@ class SeestarApp(ctk.CTk):
             messagebox.showinfo(
                 "Auto-Mark Complete",
                 f"Marked {marked} problematic image(s) for deletion.\n\n"
-                f"Click '🗑️ Delete Marked' to remove them, or use '✓ Mark' to unmark individual files."
+                f"Click 'Delete Selected' to remove them, or double-click a file to unmark it."
             )
     
     def show_quality_details(self):
