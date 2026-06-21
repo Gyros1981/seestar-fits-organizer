@@ -8,7 +8,7 @@ import customtkinter as ctk
 from pathlib import Path
 import logging
 
-from ui.theme import INFO, INFO_HOVER
+from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,8 @@ class DisclaimerWindow(ctk.CTkToplevel):
             text="📄 View Terms of Service",
             font=self.get_font(14),
             height=40,
+            fg_color=SECONDARY,
+            hover_color=SECONDARY_HOVER,
             command=self.show_tos
         )
         tos_button.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -112,8 +114,8 @@ class DisclaimerWindow(ctk.CTkToplevel):
             text="Continue to App",
             font=self.get_font(14, weight="bold"),
             height=40,
-            fg_color=INFO,
-            hover_color=INFO_HOVER,
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             command=self.continue_to_app
         )
         continue_button.pack(side="right", fill="x", expand=True, padx=(5, 0))

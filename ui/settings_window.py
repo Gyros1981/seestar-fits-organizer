@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 import json
 import logging
 
-from ui.theme import INFO, INFO_HOVER
+from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,9 @@ class SettingsWindow(ctk.CTkToplevel):
             button_frame,
             text="📥 Import Tags",
             command=self.import_tags,
-            height=35
+            height=35,
+            fg_color=SECONDARY,
+            hover_color=SECONDARY_HOVER
         )
         import_button.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
@@ -199,7 +201,9 @@ class SettingsWindow(ctk.CTkToplevel):
             button_frame,
             text="📤 Export Tags",
             command=self.export_tags,
-            height=35
+            height=35,
+            fg_color=SECONDARY,
+            hover_color=SECONDARY_HOVER
         )
         export_button.pack(side="right", fill="x", expand=True, padx=(5, 0))
         
@@ -218,7 +222,9 @@ class SettingsWindow(ctk.CTkToplevel):
             disclaimer_frame,
             text="🔄 Show Disclaimer on Startup",
             command=self.reset_disclaimer,
-            height=35
+            height=35,
+            fg_color=SECONDARY,
+            hover_color=SECONDARY_HOVER
         )
         reset_disclaimer_button.pack(fill="x", padx=10, pady=(0, 10))
         
@@ -237,8 +243,8 @@ class SettingsWindow(ctk.CTkToplevel):
         save_button = ctk.CTkButton(
             action_frame,
             text="Save",
-            fg_color=INFO,
-            hover_color=INFO_HOVER,
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             command=self.save_settings,
             height=40
         )
@@ -248,7 +254,9 @@ class SettingsWindow(ctk.CTkToplevel):
             action_frame,
             text="Cancel",
             command=self.destroy,
-            height=40
+            height=40,
+            fg_color=NEUTRAL,
+            hover_color=NEUTRAL_HOVER
         )
         cancel_button.pack(side="right", fill="x", expand=True, padx=(5, 0))
     

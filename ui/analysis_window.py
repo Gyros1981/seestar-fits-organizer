@@ -19,6 +19,10 @@ from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from .preview_window import PreviewWindow
+from ui.theme import (
+    ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
+    NEUTRAL, NEUTRAL_HOVER,
+)
 
 # SIMBAD TAP service endpoint
 SIMBAD_TAP_URL = "http://simbad.u-strasbg.fr/simbad/sim-tap/sync"
@@ -842,8 +846,8 @@ class AnalysisWindow(ctk.CTkToplevel):
             text="📥 Export to CSV",
             font=self.get_font(14, weight="bold"),
             height=40,
-            fg_color="#1E90FF",
-            hover_color="#4169E1",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             command=self.export_to_csv
         )
         export_button.pack(side="right")
@@ -894,8 +898,8 @@ class AnalysisWindow(ctk.CTkToplevel):
             text="📊 Aggregate Statistics",
             font=self.get_font(14, weight="bold"),
             height=40,
-            fg_color="#2E8B57",  # Sea green color to differentiate
-            hover_color="#3CB371",
+            fg_color=SECONDARY,
+            hover_color=SECONDARY_HOVER,
             command=lambda: self.show_aggregate_stats()
         )
         agg_button.pack(fill="x", pady=(0, 10))
@@ -1147,8 +1151,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text="🗺️ Open in Google Maps",
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#4285F4",
-                        hover_color="#3367D6",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda l=avg_lat, ln=avg_lon: self.open_google_maps(str(l), str(ln))
                     )
                     maps_button.pack(fill="x", padx=10, pady=(0, 5))
@@ -1161,8 +1165,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text=tag_button_text,
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#FFA500",
-                        hover_color="#FF8C00",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda l=avg_lat, ln=avg_lon: self.open_tag_dialog(str(l), str(ln))
                     )
                     tag_button.pack(fill="x", padx=10, pady=(5, 10))
@@ -1420,8 +1424,8 @@ class AnalysisWindow(ctk.CTkToplevel):
         save_button = ctk.CTkButton(
             button_frame,
             text="Save",
-            fg_color="#2E8B57",
-            hover_color="#3CB371",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
             command=save_tag
         )
         save_button.pack(side="left", padx=(0, 5))
@@ -1430,8 +1434,8 @@ class AnalysisWindow(ctk.CTkToplevel):
             delete_button = ctk.CTkButton(
                 button_frame,
                 text="Delete",
-                fg_color="#DC143C",
-                hover_color="#B22222",
+                fg_color=DANGER,
+                hover_color=DANGER_HOVER,
                 command=delete_tag
             )
             delete_button.pack(side="left", padx=(0, 5))
@@ -1439,6 +1443,8 @@ class AnalysisWindow(ctk.CTkToplevel):
         cancel_button = ctk.CTkButton(
             button_frame,
             text="Cancel",
+            fg_color=NEUTRAL,
+            hover_color=NEUTRAL_HOVER,
             command=dialog.destroy
         )
         cancel_button.pack(side="right")
@@ -1689,8 +1695,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text=tag_button_text,
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#FFA500",
-                        hover_color="#FF8C00",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda l=project['latitude'], ln=project['longitude']: self.open_tag_dialog(str(l), str(ln))
                     )
                     tag_button.pack(fill="x", padx=10, pady=(0, 5))
@@ -1701,8 +1707,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text="🗺️ Open in Google Maps",
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#4285F4",
-                        hover_color="#3367D6",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda l=project['latitude'], ln=project['longitude']: self.open_google_maps(str(l), str(ln))
                     )
                     maps_button.pack(fill="x", padx=10, pady=(0, 10))
@@ -1743,8 +1749,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text="🔭 Open in Sky Atlas (Aladin)",
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#2E86AB",
-                        hover_color="#1E5F7A",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda r=ra, d=dec, name=obj: self.open_sky_atlas(r, d, name)
                     )
                     sky_button.pack(fill="x", padx=10, pady=(0, 5))
@@ -1755,8 +1761,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                         text="🔍 Preview Image",
                         font=self.get_font(12),
                         height=32,
-                        fg_color="#4A90A4",
-                        hover_color="#3A7A8C",
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
                         command=lambda p=project, o=obj: self.open_image_preview(p, o)
                     )
                     preview_button.pack(fill="x", padx=10, pady=(0, 10))
