@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 from .preview_window import PreviewWindow
 from ui.theme import (
     ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
-    NEUTRAL, NEUTRAL_HOVER,
+    NEUTRAL, NEUTRAL_HOVER, TEXT_MUTED,
 )
 
 # SIMBAD TAP service endpoint
@@ -858,7 +858,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 main_frame,
                 text="No projects found in the selected directory.\nMake sure you have folders ending with '_Project'.",
                 font=self.get_font(14),
-                text_color="gray"
+                text_color=TEXT_MUTED
             )
             no_data_label.pack(pady=50)
             return
@@ -929,7 +929,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             self.details_scroll,
             text="Click on a project to view details",
             font=self.get_font(14),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         self.no_selection_label.pack(pady=50)
     
@@ -1117,7 +1117,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     header_frame,
                     text=f"{len(group)} projects",
                     font=self.get_font(12),
-                    text_color="gray"
+                    text_color=TEXT_MUTED
                 )
                 count_label.pack(side="right")
                 
@@ -1624,7 +1624,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         path_textbox = ctk.CTkTextbox(summary_content, height=30)
         path_textbox.pack(fill="x", padx=10, pady=(0, 5))
         path_textbox.insert("1.0", project['path'])
-        path_textbox.configure(state="disabled", font=self.get_font(12), text_color="gray")
+        path_textbox.configure(state="disabled", font=self.get_font(12), text_color=TEXT_MUTED)
         
         # Open in File Explorer button
         open_button = ctk.CTkButton(

@@ -20,14 +20,15 @@ except ImportError:
     SEND2TRASH_AVAILABLE = False
 
 # Import core business logic
-from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
+from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer, ImageQualityAnalyzer
 
 # Import UI components
 from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow, FileTypeSelectionDialog, detect_file_types_in_directories
 from ui.theme import (
     ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
     NEUTRAL, NEUTRAL_HOVER, TOOLTIP_BG, SEPARATOR_GRAY, SEPARATOR_HOVER,
-    SURFACE_DARK, SELECT_BG, TEXT_LIGHT, TEXT_MUTED, TEXT_DIM, TEXT_FAINT,
+    SURFACE_DARK, SELECT_BG, TEXT_PRIMARY, TEXT_ON_ACCENT, TEXT_LIGHT,
+    TEXT_MUTED, TEXT_DIM, TEXT_FAINT,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ class SeestarApp(ctk.CTk):
         if seestar_dir and Path(seestar_dir).exists():
             self.seestar_dir = Path(seestar_dir)
             if hasattr(self, 'seestar_path_label'):
-                self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
+                self.seestar_path_label.configure(text=str(self.seestar_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Loaded saved Seestar directory: {self.seestar_dir}")
         
         # Load Raw directory
@@ -96,7 +97,7 @@ class SeestarApp(ctk.CTk):
         if raw_dir and Path(raw_dir).exists():
             self.raw_dir = Path(raw_dir)
             if hasattr(self, 'raw_path_label'):
-                self.raw_path_label.configure(text=str(self.raw_dir), text_color="white")
+                self.raw_path_label.configure(text=str(self.raw_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Loaded saved Raw directory: {self.raw_dir}")
         
         # Load Projects directory
@@ -104,13 +105,13 @@ class SeestarApp(ctk.CTk):
         if projects_dir and Path(projects_dir).exists():
             self.projects_dir = Path(projects_dir)
             if hasattr(self, 'projects_path_label'):
-                self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
+                self.projects_path_label.configure(text=str(self.projects_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Loaded saved Projects directory: {self.projects_dir}")
             
             # Also load into analyze_projects_dir for reuse
             self.analyze_projects_dir = Path(projects_dir)
             if hasattr(self, 'analyze_projects_path_label'):
-                self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
+                self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color=TEXT_PRIMARY)
     
     def _create_menu_item(self, parent, text, font, command):
         """Create a traditional menu item button.
@@ -132,7 +133,7 @@ class SeestarApp(ctk.CTk):
             fg_color="transparent",
             hover_color=ACCENT_HOVER,
             border_width=0,
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             cursor="hand2",
             command=command
         )
@@ -156,7 +157,7 @@ class SeestarApp(ctk.CTk):
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER,
             border_width=0,
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             anchor="w",
             cursor="hand2",
             command=command
@@ -254,7 +255,7 @@ class SeestarApp(ctk.CTk):
             text=text,
             font=self.get_font(10),
             fg_color=TOOLTIP_BG,
-            text_color="white",
+            text_color=TEXT_PRIMARY,
             corner_radius=5,
             padx=8,
             pady=4
@@ -303,7 +304,7 @@ class SeestarApp(ctk.CTk):
             fg_color="transparent",
             hover_color=ACCENT_HOVER,
             border_width=0,
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=lambda: (self.destroy_all_menus(), self.show_mode('welcome'))
         )
         home_btn.grid(row=0, column=0, padx=2, pady=2)
@@ -352,7 +353,7 @@ class SeestarApp(ctk.CTk):
             fg_color="transparent",
             hover_color=ACCENT_HOVER,
             border_width=0,
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=lambda: (self.destroy_all_menus(), self.show_mode('settings'))
         )
         settings_btn.grid(row=0, column=5, padx=2, pady=2)
@@ -386,7 +387,7 @@ class SeestarApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color=SEPARATOR_GRAY,
             hover_color=SEPARATOR_HOVER,
-            text_color="white",
+            text_color=TEXT_PRIMARY,
             command=self.toggle_console
         )
         self.console_toggle_btn.place(relx=0.5, rely=0.5, anchor="center")
@@ -430,7 +431,7 @@ class SeestarApp(ctk.CTk):
                  "🔧 Tools → 🖼️ FITS Viewer\n"
                  "⚙️ Settings → Configure app settings",
             font=self.get_font(16),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         welcome_text.pack(pady=20)
         
@@ -506,7 +507,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Seestar MyWork Directory")
         if directory:
             self.seestar_dir = Path(directory)
-            self.seestar_path_label.configure(text=str(self.seestar_dir), text_color="white")
+            self.seestar_path_label.configure(text=str(self.seestar_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected Seestar directory: {self.seestar_dir}")
             # Save to settings
             self.settings.set_seestar_dir(directory)
@@ -516,7 +517,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Raw Directory (Target)")
         if directory:
             self.raw_dir = Path(directory)
-            self.raw_path_label.configure(text=str(self.raw_dir), text_color="white")
+            self.raw_path_label.configure(text=str(self.raw_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected raw directory: {self.raw_dir}")
             # Save to settings
             self.settings.set_raw_dir(directory)
@@ -526,7 +527,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Projects Directory")
         if directory:
             self.projects_dir = Path(directory)
-            self.projects_path_label.configure(text=str(self.projects_dir), text_color="white")
+            self.projects_path_label.configure(text=str(self.projects_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected projects directory: {self.projects_dir}")
             # Save to settings
             self.settings.set_projects_dir(directory)
@@ -536,7 +537,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Projects Directory for Analysis")
         if directory:
             self.analyze_projects_dir = Path(directory)
-            self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color="white")
+            self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected analyze projects directory: {self.analyze_projects_dir}")
             # Also save to projects_dir setting for reuse
             self.settings.set_projects_dir(directory)
@@ -546,7 +547,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Seestar MyWorks Directory")
         if directory:
             self.ps_source_dir = Path(directory)
-            self.ps_source_path_label.configure(text=str(self.ps_source_dir), text_color="white")
+            self.ps_source_path_label.configure(text=str(self.ps_source_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected Planetary & Scenery source: {self.ps_source_dir}")
     
     def select_ps_target_dir(self):
@@ -554,7 +555,7 @@ class SeestarApp(ctk.CTk):
         directory = filedialog.askdirectory(title="Select Target Directory for Planetary & Scenery")
         if directory:
             self.ps_target_dir = Path(directory)
-            self.ps_target_path_label.configure(text=str(self.ps_target_dir), text_color="white")
+            self.ps_target_path_label.configure(text=str(self.ps_target_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Selected Planetary & Scenery target: {self.ps_target_dir}")
     
     def start_scan(self):
@@ -1194,7 +1195,7 @@ class SeestarApp(ctk.CTk):
             command=self.browse_fits_directory, 
             width=100,
             font=self.get_font(11),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
         )
@@ -1231,7 +1232,7 @@ class SeestarApp(ctk.CTk):
             command=self.clear_all_marks, 
             width=80, 
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
         )
@@ -1243,7 +1244,7 @@ class SeestarApp(ctk.CTk):
             command=self.delete_marked_fits, 
             width=100, 
             font=self.get_font(10),
-            text_color="white",
+            text_color=TEXT_PRIMARY,
             fg_color=DANGER,
             hover_color=DANGER_HOVER
         )
@@ -1270,7 +1271,7 @@ class SeestarApp(ctk.CTk):
             command=self.analyze_all_fits,
             width=90, 
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
         )
@@ -1282,7 +1283,7 @@ class SeestarApp(ctk.CTk):
             command=self.auto_mark_problematic,
             width=100, 
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
         )
@@ -1295,7 +1296,7 @@ class SeestarApp(ctk.CTk):
             command=self.show_analysis_report,
             width=110,
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
         )
@@ -1399,7 +1400,7 @@ class SeestarApp(ctk.CTk):
             width=30, 
             height=30,
             font=self.get_font(14),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=self.zoom_fits_in,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
@@ -1423,7 +1424,7 @@ class SeestarApp(ctk.CTk):
             width=30, 
             height=30,
             font=self.get_font(14),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=self.zoom_fits_out,
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
@@ -1440,7 +1441,7 @@ class SeestarApp(ctk.CTk):
             text="Previous",
             width=80,
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=lambda: self.navigate_fits_files(-1),
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
@@ -1453,7 +1454,7 @@ class SeestarApp(ctk.CTk):
             text="Next",
             width=80,
             font=self.get_font(10),
-            text_color="black",
+            text_color=TEXT_ON_ACCENT,
             command=lambda: self.navigate_fits_files(1),
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER
@@ -1954,8 +1955,6 @@ class SeestarApp(ctk.CTk):
     def _reapply_analysis_threshold(self):
         """Re-apply current sensitivity threshold to cached analysis results."""
         try:
-            from core.image_quality import ImageQualityAnalyzer
-            
             analyzer = ImageQualityAnalyzer(streak_sensitivity=self.current_sensitivity)
             
             # Re-apply threshold to all cached reports
@@ -2020,7 +2019,6 @@ class SeestarApp(ctk.CTk):
         """Background thread for analyzing all files."""
         try:
             from astropy.io import fits
-            from core.image_quality import ImageQualityAnalyzer
             
             total = len(self.fits_files)
             logger.info(f"Starting analysis of {total} files...")
@@ -2163,7 +2161,6 @@ class SeestarApp(ctk.CTk):
         details += f"   Average FWHM: {report.avg_fwhm:.2f} pixels\n"
         details += f"   Eccentricity: {report.avg_eccentricity:.2f}\n"
         
-        from core.image_quality import ImageQualityAnalyzer
         if report.background_gradient > ImageQualityAnalyzer.DEFAULT_GRADIENT_THRESHOLD:
             details += f"\n⚠️ Uneven background (gradient: {report.background_gradient:.2f})\n"
         
@@ -2200,7 +2197,6 @@ class SeestarApp(ctk.CTk):
             )
             return
         
-        from core.image_quality import ImageQualityAnalyzer
         gradient_threshold = ImageQualityAnalyzer.DEFAULT_GRADIENT_THRESHOLD
         
         reports = list(self.quality_reports.values())
@@ -2293,7 +2289,7 @@ class SeestarApp(ctk.CTk):
             location_frame,
             text="Locations within this distance will be grouped together (default: 0.005 ≈ 600 yards)",
             font=self.get_font(10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
         
@@ -2353,7 +2349,7 @@ class SeestarApp(ctk.CTk):
             coord_frame,
             text="'Hours/Minutes/Seconds' shows RA as HH:MM:SS and DEC as DD:MM:SS",
             font=self.get_font(10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         coord_help.pack(anchor="w", padx=10, pady=(0, 10))
         
@@ -2380,7 +2376,7 @@ class SeestarApp(ctk.CTk):
             disclaimer_frame,
             text="Toggle ON to show the disclaimer window on next startup",
             font=self.get_font(10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         disclaimer_help.pack(anchor="w", padx=10, pady=(0, 10))
         
@@ -2415,7 +2411,7 @@ class SeestarApp(ctk.CTk):
             text_scale_frame,
             text="Changes take effect after restarting the application",
             font=self.get_font(10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         text_scale_help.pack(anchor="w", padx=10, pady=(0, 10))
         

@@ -8,7 +8,7 @@ import customtkinter as ctk
 from pathlib import Path
 from typing import List
 
-from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER
+from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER, TEXT_MUTED
 
 
 class FolderSelectionWindow(ctk.CTkToplevel):
@@ -73,7 +73,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             main_frame,
             text=f"Found {len(self.folders)} folder(s). Select which ones to process:",
             font=self.get_font(12),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         desc_label.pack(anchor="w", pady=(0, 10))
         

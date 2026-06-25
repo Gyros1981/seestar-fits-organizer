@@ -7,6 +7,7 @@ Provides automated detection of problematic astrophotography images:
 - Background gradients and uneven illumination
 """
 
+import importlib.util
 import numpy as np
 import logging
 from typing import Dict, List, Tuple, Optional
@@ -15,23 +16,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Try to import scikit-image, provide fallback if not available
-try:
-    from skimage.transform import hough_line, hough_line_peaks
-    from skimage.feature import canny
-    from skimage.filters import sobel, threshold_otsu
-    from skimage.morphology import remove_small_objects
-    SKIMAGE_AVAILABLE = True
-except ImportError:
-    SKIMAGE_AVAILABLE = False
-    logger.warning("scikit-image not available. Image quality analysis will be limited.")
+# Detect optional heavy dependencies WITHOUT importing them, so that importing
+# this module (and the core package) stays fast at startup. The actual skimage
+# and photutils imports happen lazily inside the methods that use them
+# (_detect_streaks and _analyze_star_shapes), which only run in non-fast mode.
+SKIMAGE_AVAILABLE = importlib.util.find_spec("skimage") is not None
+PHOTUTILS_AVAILABLE = importlib.util.find_spec("photutils") is not None
 
-try:
-    from photutils.detection import DAOStarFinder
-    from photutils.aperture import CircularAperture, aperture_photometry
-    PHOTUTILS_AVAILABLE = True
-except ImportError:
-    PHOTUTILS_AVAILABLE = False
+if not SKIMAGE_AVAILABLE:
+    logger.warning("scikit-image not available. Image quality analysis will be limited.")
+if not PHOTUTILS_AVAILABLE:
     logger.warning("photutils not available. Star quality analysis will be limited.")
 
 
@@ -183,6 +177,9 @@ class ImageQualityAnalyzer:
         Returns:
             (has_streaks, streak_count, confidence, raw_streak_ratio)
         """
+        from skimage.feature import canny
+        from skimage.transform import hough_line, hough_line_peaks
+        
         # Normalize image
         img_norm = (image - image.min()) / (image.max() - image.min() + 1e-8)
         
@@ -310,6 +307,8 @@ class ImageQualityAnalyzer:
         Returns:
             (quality_label, avg_fwhm, avg_eccentricity)
         """
+        from photutils.detection import DAOStarFinder
+        
         # Normalize and convert to float
         img_float = image.astype(np.float64)
         

@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 import json
 import logging
 
-from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER
+from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER, TEXT_MUTED
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class SettingsWindow(ctk.CTkToplevel):
             location_frame,
             text="Locations within this distance will be grouped together (default: 0.005 ≈ 600 yards)",
             font=ctk.CTkFont(size=10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
         
@@ -168,7 +168,7 @@ class SettingsWindow(ctk.CTkToplevel):
             coord_frame,
             text="'Hours/Minutes/Seconds' shows RA as HH:MM:SS and DEC as DD:MM:SS",
             font=ctk.CTkFont(size=10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         coord_help.pack(anchor="w", padx=10, pady=(0, 10))
         
@@ -232,7 +232,7 @@ class SettingsWindow(ctk.CTkToplevel):
             disclaimer_frame,
             text="Click to show the disclaimer window again on next startup",
             font=ctk.CTkFont(size=10),
-            text_color="gray"
+            text_color=TEXT_MUTED
         )
         disclaimer_help.pack(anchor="w", padx=10, pady=(0, 10))
         

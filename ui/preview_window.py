@@ -13,6 +13,8 @@ import numpy as np
 from astropy.io import fits
 from PIL import Image, ImageTk
 
+from ui.theme import DANGER
+
 logger = logging.getLogger(__name__)
 
 
@@ -199,7 +201,7 @@ class PreviewWindow(ctk.CTkToplevel):
             self.main_frame,
             text=f"Error loading image:\n{message}",
             font=ctk.CTkFont(size=12),
-            text_color="red"
+            text_color=DANGER
         )
         error_label.pack(pady=50)
         messagebox.showerror("Preview Error", f"Failed to load image preview: {message}")
