@@ -628,11 +628,18 @@ class AnalysisWindow(ctk.CTkToplevel):
                     all_project_exposure_times.update(lights_by_exposure.keys())
                 sorted_project_exposures = sorted(all_project_exposure_times)
 
-                # Build project summary headers with exposure breakdown columns
+                # Collect all unique filters across all projects for column headers
+                all_project_filters = set()
+                for project in self.results['projects']:
+                    all_project_filters.update(project.get('lights_by_filter', {}).keys())
+                sorted_project_filters = sorted(all_project_filters)
+
+                # Build project summary headers with exposure and filter breakdown columns
                 project_base_headers = ['Project Name', 'Common Name (if known)', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
                                'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count']
                 project_exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_project_exposures]
-                writer.writerow(project_base_headers + project_exposure_headers)
+                project_filter_headers = [f'{filt} Filter Lights (count)' for filt in sorted_project_filters]
+                writer.writerow(project_base_headers + project_exposure_headers + project_filter_headers)
 
                 for project in self.results['projects']:
                     project_name = project.get('name', 'Unknown')
@@ -662,7 +669,11 @@ class AnalysisWindow(ctk.CTkToplevel):
                         count = lights_by_exposure.get(exp, 0)
                         project_exposure_counts.append(count)
 
-                    writer.writerow(project_base_row + project_exposure_counts)
+                    # Add light counts for each filter column at project level
+                    project_lights_by_filter = project.get('lights_by_filter', {})
+                    project_filter_counts = [project_lights_by_filter.get(filt, 0) for filt in sorted_project_filters]
+
+                    writer.writerow(project_base_row + project_exposure_counts + project_filter_counts)
                 
                 writer.writerow([])  # Empty row separator
                 
@@ -681,6 +692,14 @@ class AnalysisWindow(ctk.CTkToplevel):
                         all_exposure_times.update(lights_by_exposure.keys())
                 sorted_exposure_times = sorted(all_exposure_times)
 
+                # Collect all unique filters across all sessions for column headers
+                all_session_filters = set()
+                for project in self.results['projects']:
+                    for session in project.get('sessions', []):
+                        lights_by_filter = session[9] if len(session) > 9 else {}
+                        all_session_filters.update(lights_by_filter.keys())
+                sorted_session_filters = sorted(all_session_filters)
+
                 # Build dynamic headers with parenthetical explanations
                 base_headers = ['Project Name', 'Session Start (Local Time)', 'Session End (Local Time)', 'Session Duration (hrs)',
                                'Object Name', 'Common Name (if known)', ra_header, dec_header, 'Constellation',
@@ -688,16 +707,17 @@ class AnalysisWindow(ctk.CTkToplevel):
                                'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
                                'Total Integration Time (hrs)']
 
-                # Add exposure breakdown columns
+                # Add exposure and filter breakdown columns
                 exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_exposure_times]
-                writer.writerow(base_headers + exposure_headers)
+                filter_headers = [f'{filt} Filter Lights (count)' for filt in sorted_session_filters]
+                writer.writerow(base_headers + exposure_headers + filter_headers)
                 
                 for project in self.results['projects']:
                     project_name = project.get('name', 'Unknown')
                     sessions = project.get('sessions', [])
                     
                     for session in sessions:
-                        # Sessions are tuples: (obj_name, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure)
+                        # Sessions are tuples: (obj_name, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure, lights_by_filter)
                         obj_name = session[0] if len(session) > 0 else 'N/A'
                         ra = session[1] if len(session) > 1 else None
                         dec = session[2] if len(session) > 2 else None
@@ -707,6 +727,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                         integration_sec = session[6] if len(session) > 6 else 0
                         exposures = session[7] if len(session) > 7 else []
                         lights_by_exposure = session[8] if len(session) > 8 else {}
+                        lights_by_filter = session[9] if len(session) > 9 else {}
 
                         # Get common name for this object
                         obj_common_name = get_common_name(obj_name)
@@ -762,7 +783,10 @@ class AnalysisWindow(ctk.CTkToplevel):
                             count = lights_by_exposure.get(exp, 0)
                             exposure_counts.append(count)
 
-                        writer.writerow(base_row + exposure_counts)
+                        # Add light counts for each filter column
+                        filter_counts = [lights_by_filter.get(filt, 0) for filt in sorted_session_filters]
+
+                        writer.writerow(base_row + exposure_counts + filter_counts)
                 
                 writer.writerow([])  # Empty row separator
                 

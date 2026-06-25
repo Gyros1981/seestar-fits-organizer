@@ -35,12 +35,14 @@ class ProjectAnalysis:
         # Track frame counts by exposure time
         self.lights_by_exposure = {}  # {exposure_time: count}
         self.darks_by_exposure = {}  # {exposure_time: count}
+        # Track light frame counts by filter
+        self.lights_by_filter = {}  # {filter_name: count}
         # Capture location (site)
         self.site = None
         self.longitude = None
         self.latitude = None
         # Sessions (grouped by time gaps, per object)
-        self.sessions = []  # List of (object, start, end, lights, integration_seconds, exposures, lights_by_exposure) tuples
+        self.sessions = []  # List of (object, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure, lights_by_filter) tuples
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -60,6 +62,7 @@ class ProjectAnalysis:
             'exposures': sorted(list(self.exposures)),
             'lights_by_exposure': dict(sorted(self.lights_by_exposure.items())),
             'darks_by_exposure': dict(sorted(self.darks_by_exposure.items())),
+            'lights_by_filter': dict(sorted(self.lights_by_filter.items())),
             'site': self.site,
             'longitude': self.longitude,
             'latitude': self.latitude,
@@ -236,6 +239,9 @@ class ProjectAnalyzer:
                     
                     if frame_type == 'LIGHT':
                         analysis.lights += 1
+                        # Track lights by filter
+                        if metadata.filter:
+                            analysis.lights_by_filter[metadata.filter] = analysis.lights_by_filter.get(metadata.filter, 0) + 1
                         if metadata.exptime:
                             analysis.integration_seconds += metadata.exptime
                             analysis.exposures.add(metadata.exptime)
@@ -278,7 +284,7 @@ class ProjectAnalyzer:
                             
                             if metadata.object not in object_session_data:
                                 object_session_data[metadata.object] = []
-                            object_session_data[metadata.object].append((metadata.date_obs, metadata.exptime, frame_type == 'LIGHT'))
+                            object_session_data[metadata.object].append((metadata.date_obs, metadata.exptime, frame_type == 'LIGHT', metadata.filter))
                     if metadata.filter:
                         analysis.filters.add(metadata.filter)
                             
@@ -298,10 +304,11 @@ class ProjectAnalyzer:
                 current_session_integration = 0.0
                 current_session_exposures = set()
                 current_session_lights_by_exposure = {}
+                current_session_lights_by_filter = {}
                 
                 # Get all data for this object
                 obj_data = object_session_data.get(obj_name, [])
-                obj_data_dict = {ts: (exptime, is_light) for ts, exptime, is_light in obj_data}
+                obj_data_dict = {ts: (exptime, is_light, filt) for ts, exptime, is_light, filt in obj_data}
                 
                 # Get RA/DEC for this object
                 ra, dec = object_coords.get(obj_name, (None, None))
@@ -315,7 +322,8 @@ class ProjectAnalyzer:
                         analysis.sessions.append((obj_name, ra, dec, current_session_start, current_session_end, 
                                                   current_session_lights, current_session_integration, 
                                                   sorted(list(current_session_exposures)),
-                                                  dict(sorted(current_session_lights_by_exposure.items()))))
+                                                  dict(sorted(current_session_lights_by_exposure.items())),
+                                                  dict(sorted(current_session_lights_by_filter.items()))))
                         # Start new session
                         current_session_start = ts
                         current_session_end = ts
@@ -323,15 +331,18 @@ class ProjectAnalyzer:
                         current_session_integration = 0.0
                         current_session_exposures = set()
                         current_session_lights_by_exposure = {}
+                        current_session_lights_by_filter = {}
                     else:
                         # Extend current session
                         current_session_end = ts
                     
                     # Add session data
                     if ts in obj_data_dict:
-                        exptime, is_light = obj_data_dict[ts]
+                        exptime, is_light, filt = obj_data_dict[ts]
                         if is_light:
                             current_session_lights += 1
+                            if filt:
+                                current_session_lights_by_filter[filt] = current_session_lights_by_filter.get(filt, 0) + 1
                             if exptime:
                                 current_session_integration += exptime
                                 current_session_exposures.add(exptime)
@@ -344,7 +355,8 @@ class ProjectAnalyzer:
                 analysis.sessions.append((obj_name, ra, dec, current_session_start, current_session_end,
                                           current_session_lights, current_session_integration,
                                           sorted(list(current_session_exposures)),
-                                          dict(sorted(current_session_lights_by_exposure.items()))))
+                                          dict(sorted(current_session_lights_by_exposure.items())),
+                                          dict(sorted(current_session_lights_by_filter.items()))))
             
             # Set overall start/end for backward compatibility
             all_timestamps = []
