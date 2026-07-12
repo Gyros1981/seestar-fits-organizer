@@ -17,7 +17,7 @@ import json
 import os
 from pathlib import Path
 from urllib.request import urlopen, Request
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from .preview_window import PreviewWindow
 from ui.theme import (
     ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
@@ -54,21 +54,23 @@ def save_common_names_cache(cache):
 
 def query_simbad_batch(object_names):
     """
-    Query SIMBAD script service for common names of multiple objects.
+    Query SIMBAD script service for common names and object types of multiple objects.
     
-    Uses the SIMBAD script service to get all identifiers, then extracts
-    common names (those starting with 'NAME ').
+    Uses the SIMBAD script service to get all identifiers and the verbose object type.
+    Common names are identifiers starting with 'NAME '.
+    Object type is retrieved via %OTYPE(V).
     
     Args:
         object_names: List of object names to query (e.g., ['M51', 'NGC6960'])
         
     Returns:
-        Dict mapping normalized object names to common names
+        Tuple of (names_dict, types_dict) both mapping normalized object names to strings
     """
     if not object_names:
-        return {}
+        return {}, {}
     
-    results = {}
+    names_results = {}
+    types_results = {}
     
     # Format object names for SIMBAD (add spaces after M/NGC/IC if needed)
     formatted_names = []
@@ -84,12 +86,10 @@ def query_simbad_batch(object_names):
         else:
             formatted_names.append(name_upper)
     
-    # Query each object using SIMBAD script service
-    # Note: We could do a batch query but individual queries are more reliable
     for obj_name in formatted_names:
         try:
-            # SIMBAD script to get all identifiers
-            script = f'format object "%IDLIST"\nquery id {obj_name}'
+            # Fetch identifiers and verbose object type in one request
+            script = f'format object "%IDLIST|%OTYPE(V)"\nquery id {obj_name}'
             encoded_script = quote(script, safe='')
             url = f"http://simbad.u-strasbg.fr/simbad/sim-script?script={encoded_script}"
             
@@ -98,35 +98,49 @@ def query_simbad_batch(object_names):
             with urlopen(req, timeout=30) as response:
                 content = response.read().decode('utf-8')
             
-            # Extract the data section
             if '::data::' in content:
                 data_section = content.split('::data::')[1].strip()
+                normalized = obj_name.upper().replace(' ', '').replace('-', '')
+                
+                # The last non-empty line contains "idlist|otype"
+                lines = [l.strip() for l in data_section.split('\n') if l.strip()]
+                
+                # Extract object type from the last line (format: "last_id|Otype")
+                obj_type = None
+                for line in reversed(lines):
+                    if '|' in line:
+                        obj_type = line.split('|')[-1].strip()
+                        break
+                
+                if obj_type:
+                    types_results[normalized] = obj_type
+                    logger.debug(f"Found object type for {obj_name}: {obj_type}")
                 
                 # Look for common names (identifiers starting with 'NAME ')
                 common_names = []
-                for line in data_section.split('\n'):
-                    line = line.strip()
+                for line in lines:
                     if line.startswith('NAME '):
-                        # Extract the name after 'NAME '
                         common_name = line[5:].strip()
+                        # Strip trailing type suffix if present (e.g. "Fireworks Galaxy|HII Galaxy")
+                        if '|' in common_name:
+                            common_name = common_name.split('|')[0].strip()
                         if common_name:
                             common_names.append(common_name)
                 
-                # Use the first common name found (usually the main one)
                 if common_names:
-                    # Normalize the object name for the key
-                    normalized = obj_name.upper().replace(' ', '').replace('-', '')
-                    results[normalized] = common_names[0]
+                    names_results[normalized] = common_names[0]
                     logger.debug(f"Found common name for {obj_name}: {common_names[0]}")
             
         except Exception as e:
             logger.debug(f"Failed to query SIMBAD for {obj_name}: {e}")
             continue
     
-    if results:
-        logger.info(f"Retrieved {len(results)} common names from SIMBAD")
+    if names_results:
+        logger.info(f"Retrieved {len(names_results)} common names from SIMBAD")
+    if types_results:
+        logger.info(f"Retrieved {len(types_results)} object types from SIMBAD")
     
-    return results
+    return names_results, types_results
 
 logger = logging.getLogger(__name__)
 
@@ -249,8 +263,9 @@ OBJECT_COMMON_NAMES = {
     'NGC6960': 'Western Veil Nebula',
     'NGC6992': 'Eastern Veil Nebula',
     'NGC6995': 'Eastern Veil Nebula',
-    'NGC6974': None,
-    'NGC6979': None,
+    'NGC6974': 'Veil Nebula',
+    'NGC6979': 'Veil Nebula',
+    'NGC6960-6992': 'Veil Nebula Complex',
     'NGC2024': 'Flame Nebula',
     'NGC2264': 'Christmas Tree Cluster',
     'NGC2237': 'Rosette Nebula',
@@ -261,7 +276,7 @@ OBJECT_COMMON_NAMES = {
     'NGC7000': 'North America Nebula',
     'NGC1976': 'Orion Nebula',
     'NGC6514': 'Trifid Nebula',
-    'NGC6523': 'Trifid Nebula',
+    'NGC6523': 'Lagoon Nebula',
     'NGC6611': 'Eagle Nebula',
     'NGC6720': 'Ring Nebula',
     'NGC1952': 'Crab Nebula',
@@ -278,9 +293,9 @@ OBJECT_COMMON_NAMES = {
     'NGC1499': 'California Nebula',
     'NGC1435': 'Merope Nebula',
     'NGC6857': None,
-    'NGC7662': 'Blue Snowball',
-    'NGC6210': None,
-    'NGC891': None,
+    'NGC7662': 'Blue Snowball Nebula',
+    'NGC6210': 'Turtle Nebula',
+    'NGC891': 'Silver Sliver Galaxy',
     'NGC457': 'Owl Cluster',
     'NGC663': None,
     'NGC869': 'Double Cluster',
@@ -293,13 +308,13 @@ OBJECT_COMMON_NAMES = {
     'NGC104': '47 Tucanae',
     'NGC2071': None,
     'NGC5139': 'Omega Centauri',
-    'NGC5904': None,
+    'NGC5904': 'M5',
     'NGC6205': 'Hercules Globular Cluster',
-    'NGC6341': None,
-    'NGC7078': None,
-    'NGC7099': None,
-    'NGC205': None,
-    'NGC221': None,
+    'NGC6341': 'M92',
+    'NGC7078': 'M15',
+    'NGC7099': 'M30',
+    'NGC205': 'M110',
+    'NGC221': 'M32',
     'NGC224': 'Andromeda Galaxy',
     'NGC598': 'Triangulum Galaxy',
     'NGC3031': 'Bode\'s Galaxy',
@@ -307,21 +322,251 @@ OBJECT_COMMON_NAMES = {
     'NGC4594': 'Sombrero Galaxy',
     'NGC5457': 'Pinwheel Galaxy',
     'NGC5194': 'Whirlpool Galaxy',
-    'NGC5195': None,
+    'NGC5195': 'Whirlpool Companion',
     'NGC6543': 'Cat\'s Eye Nebula',
+    # Additional popular NGC targets for Seestar
+    'NGC6946': 'Fireworks Galaxy',
+    'NGC2403': 'Caldwell 7',
+    'NGC7331': 'Deer Lick Galaxy',
+    'NGC7317': 'Stephan\'s Quintet',
+    'NGC7318': 'Stephan\'s Quintet',
+    'NGC7319': 'Stephan\'s Quintet',
+    'NGC7320': 'Stephan\'s Quintet',
+    'NGC7320C': 'Stephan\'s Quintet',
+    'NGC4038': 'Antennae Galaxies',
+    'NGC4039': 'Antennae Galaxies',
+    'NGC4889': 'Coma Galaxy Cluster',
+    'NGC4874': 'Coma Galaxy Cluster',
+    'NGC4649': 'M60',
+    'NGC4621': 'M59',
+    'NGC4552': 'M89',
+    'NGC4548': 'M91',
+    'NGC4501': 'M88',
+    'NGC4486': 'Virgo A',
+    'NGC4472': 'M49',
+    'NGC4303': 'M61',
+    'NGC4254': 'M99',
+    'NGC4321': 'M100',
+    'NGC4258': 'M106',
+    'NGC4051': 'Seyfert Galaxy',
+    'NGC3628': 'Hamburger Galaxy',
+    'NGC3627': 'M66',
+    'NGC3623': 'M65',
+    'NGC2903': 'Leo I Galaxy',
+    'NGC2841': 'Tiger\'s Eye Galaxy',
+    'NGC2683': 'UFO Galaxy',
+    'NGC1300': 'Barred Spiral Galaxy',
+    'NGC1232': 'Grand Design Spiral',
+    'NGC1055': None,
+    'NGC1023': None,
+    'NGC772': 'Arp 78',
+    'NGC925': None,
+    'NGC7479': 'Propeller Galaxy',
+    'NGC7814': 'Little Sombrero Galaxy',
+    'NGC7789': 'Caroline\'s Rose',
+    'NGC7762': None,
+    'NGC7380': 'Wizard Nebula',
+    'NGC7293': 'Helix Nebula',
+    'NGC7023': 'Iris Nebula',
+    'NGC6888': 'Crescent Nebula',
+    'NGC6871': None,
+    'NGC6826': 'Blinking Planetary Nebula',
+    'NGC6819': 'Foxhead Cluster',
+    'NGC6818': 'Little Gem Nebula',
+    'NGC6811': None,
+    'NGC6781': 'Snowglobe Nebula',
+    'NGC6752': 'Pavo Globular',
+    'NGC6744': None,
+    'NGC6723': None,
+    'NGC6712': None,
+    'NGC6709': None,
+    'NGC6705': 'Wild Duck Cluster',
+    'NGC6694': 'M26',
+    'NGC6681': 'M70',
+    'NGC6656': 'M22',
+    'NGC6626': 'M28',
+    'NGC6618': 'Omega Nebula',
+    'NGC6603': 'M24',
+    'NGC6530': 'Lagoon Cluster',
+    'NGC6522': None,
+    'NGC6520': None,
+    'NGC6494': 'M23',
+    'NGC6475': 'M7',
+    'NGC6405': 'M6',
+    'NGC6404': None,
+    'NGC6352': None,
+    'NGC6333': 'M9',
+    'NGC6218': 'M12',
+    'NGC6171': 'M107',
+    'NGC6093': 'M80',
+    'NGC6121': 'M4',
+    'NGC6101': None,
+    'NGC6087': None,
+    'NGC6067': None,
+    'NGC6025': None,
+    'NGC5986': None,
+    'NGC5897': None,
+    'NGC5866': 'Spindle Galaxy',
+    'NGC5813': None,
+    'NGC5746': None,
+    'NGC5689': None,
+    'NGC5676': None,
+    'NGC5566': None,
+    'NGC5548': None,
+    'NGC5506': None,
+    'NGC5474': None,
+    'NGC5466': None,
+    'NGC5364': None,
+    'NGC5363': None,
+    'NGC5353': None,
+    'NGC5350': None,
+    'NGC5322': None,
+    'NGC5248': None,
+    'NGC5236': 'Southern Pinwheel Galaxy',
+    'NGC5128': 'Centaurus A',
+    'NGC4945': None,
+    'NGC4833': None,
+    'NGC4755': 'Jewel Box Cluster',
+    'NGC4736': 'M94',
+    'NGC4631': 'Whale Galaxy',
+    'NGC4627': None,
+    'NGC4565': 'Needle Galaxy',
+    'NGC4559': None,
+    'NGC4449': None,
+    'NGC4395': None,
+    'NGC4244': 'Silver Needle Galaxy',
+    'NGC4236': None,
+    'NGC4216': None,
+    'NGC4214': None,
+    'NGC4203': None,
+    'NGC4192': 'M98',
+    'NGC4147': None,
+    'NGC4125': None,
+    'NGC4088': None,
+    'NGC4013': None,
+    'NGC3992': 'M109',
+    'NGC3982': None,
+    'NGC3953': None,
+    'NGC3938': None,
+    'NGC3893': None,
+    'NGC3877': None,
+    'NGC3729': None,
+    'NGC3718': 'Warped Galaxy',
+    'NGC3675': None,
+    'NGC3556': 'M108',
+    'NGC3521': None,
+    'NGC3516': None,
+    'NGC3486': None,
+    'NGC3414': None,
+    'NGC3384': None,
+    'NGC3379': 'M105',
+    'NGC3351': 'M95',
+    'NGC3344': None,
+    'NGC3310': 'Bow-Tie Galaxy',
+    'NGC3227': None,
+    'NGC3190': None,
+    'NGC3185': None,
+    'NGC3184': 'Little Pinwheel Galaxy',
+    'NGC3147': None,
+    'NGC3115': 'Spindle Galaxy',
+    'NGC3077': None,
+    'NGC2976': None,
+    'NGC2974': None,
+    'NGC2859': None,
+    'NGC2775': None,
+    'NGC2768': None,
+    'NGC2742': None,
+    'NGC2736': 'Pencil Nebula',
+    'NGC2359': 'Thor\'s Helmet',
+    'NGC2346': 'Butterfly Nebula',
+    'NGC2343': None,
+    'NGC2301': None,
+    'NGC2281': None,
+    'NGC2232': None,
+    'NGC2194': None,
+    'NGC2175': 'Monkey Head Nebula',
+    'NGC2169': '37 Cluster',
+    'NGC2158': None,
+    'NGC2129': None,
+    'NGC2112': None,
+    'NGC2099': 'M37',
+    'NGC2068': 'M78',
+    'NGC2067': None,
+    'NGC2063': None,
+    'NGC2022': None,
+    'NGC2023': None,
+    'NGC1977': 'Running Man Nebula',
+    'NGC1975': 'Running Man Nebula',
+    'NGC1973': 'Running Man Nebula',
+    'NGC1931': None,
+    'NGC1907': None,
+    'NGC1893': None,
+    'NGC1857': None,
+    'NGC1851': None,
+    'NGC1817': None,
+    'NGC1807': None,
+    'NGC1788': None,
+    'NGC1746': None,
+    'NGC1647': None,
+    'NGC1637': None,
+    'NGC1624': None,
+    'NGC1579': 'Northern Trifid',
+    'NGC1528': None,
+    'NGC1514': 'Crystal Ball Nebula',
+    'NGC1502': None,
+    'NGC1491': 'Fossil Footprint Nebula',
+    'NGC1432': 'Maia Nebula',
+    'NGC1333': None,
+    'NGC1316': 'Fornax A',
+    'NGC1300': 'Barred Spiral Galaxy',
+    'NGC1291': None,
+    'NGC1275': 'Perseus A',
+    'NGC1232': None,
+    'NGC1218': None,
+    'NGC1068': 'M77',
+    'NGC1055': None,
+    'NGC1049': None,
+    'NGC1022': None,
+    # IC objects (popular)
     'IC434': 'Horsehead Nebula',
     'IC4603': 'Rho Ophiuchi',
     'IC4604': 'Rho Ophiuchi',
     'IC4605': 'Rho Ophiuchi',
+    'IC4592': 'Blue Horsehead Nebula',
     'IC1318': 'Gamma Cygni Nebula',
     'IC1805': 'Heart Nebula',
     'IC1848': 'Soul Nebula',
     'IC405': 'Flaming Star Nebula',
+    'IC410': 'Tadpoles Nebula',
     'IC2177': 'Seagull Nebula',
     'IC1396': 'Elephant Trunk Nebula',
     'IC5070': 'Pelican Nebula',
     'IC5067': 'Pelican Nebula',
     'IC5146': 'Cocoon Nebula',
+    'IC2118': 'Witch Head Nebula',
+    'IC2944': 'Running Chicken Nebula',
+    'IC2948': 'Running Chicken Nebula',
+    'IC1274': None,
+    'IC4628': 'Prawn Nebula',
+    'IC4701': None,
+    'IC1274': None,
+    'IC1287': None,
+    'IC1297': None,
+    'IC2602': 'Southern Pleiades',
+    'IC2391': 'Omicron Velorum Cluster',
+    'IC2395': None,
+    'IC2488': None,
+    'IC4665': None,
+    'IC4756': None,
+    'IC5152': None,
+    'IC10': 'Local Group Starburst Galaxy',
+    'IC342': 'Hidden Galaxy',
+    'IC1101': 'Largest Known Galaxy',
+    'IC1613': None,
+    'IC2574': 'Coddington\'s Nebula',
+    'IC3583': None,
+    'IC4296': None,
+    'IC4499': None,
     # Popular star/asterism names
     'ALNILAM': None,
     'ALNITAK': None,
@@ -347,10 +592,37 @@ OBJECT_COMMON_NAMES = {
 _common_names_cache = {}
 _common_names_cache_loaded = False
 
+# Global cache for object types fetched from SIMBAD
+OBJECT_TYPES_CACHE_FILE = Path.home() / '.seestar_fits_organizer' / 'object_types_cache.json'
+_object_types_cache = {}
+_object_types_cache_loaded = False
+
+
+def load_object_types_cache():
+    """Load cached object types from file."""
+    if OBJECT_TYPES_CACHE_FILE.exists():
+        try:
+            with open(OBJECT_TYPES_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_object_types_cache(cache):
+    """Save object types cache to file."""
+    try:
+        OBJECT_TYPES_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(OBJECT_TYPES_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"Could not save object types cache: {e}")
+
 
 def _ensure_cache_loaded():
-    """Ensure the common names cache is loaded."""
+    """Ensure the common names and object types caches are loaded."""
     global _common_names_cache, _common_names_cache_loaded
+    global _object_types_cache, _object_types_cache_loaded
     if not _common_names_cache_loaded:
         _common_names_cache = load_common_names_cache()
         # Merge with built-in dictionary
@@ -358,6 +630,33 @@ def _ensure_cache_loaded():
             if value and key not in _common_names_cache:
                 _common_names_cache[key] = value
         _common_names_cache_loaded = True
+    if not _object_types_cache_loaded:
+        _object_types_cache = load_object_types_cache()
+        _object_types_cache_loaded = True
+
+
+def get_object_type(object_name: str) -> str:
+    """Get the SIMBAD verbose object type for an astronomical object.
+
+    Returns empty string if not known.
+    """
+    if not object_name:
+        return ''
+    normalized = object_name.upper().replace(' ', '').replace('-', '')
+    _ensure_cache_loaded()
+    return _object_types_cache.get(normalized, '')
+
+
+def get_display_label(object_name: str) -> str:
+    """Return the best available label for an object.
+
+    Priority: common name > SIMBAD object type > empty string.
+    Used to build the parenthetical annotation shown in the UI.
+    """
+    common = get_common_name(object_name)
+    if common:
+        return common
+    return get_object_type(object_name)
 
 
 def get_common_name(object_name: str) -> str:
@@ -427,32 +726,42 @@ def lookup_common_names_batch(projects):
     
     _ensure_cache_loaded()
     
-    # Collect all unique objects that aren't in our cache yet
+    # Collect objects that need a SIMBAD query:
+    # - not in the names cache at all (truly unknown), OR
+    # - in the names cache as None (no common name) but not yet in the types cache
     unknown_objects = set()
     for project in projects:
         objects = project.get('objects', [])
         for obj in objects:
             if obj:
                 normalized = obj.upper().replace(' ', '').replace('-', '')
-                if normalized not in _common_names_cache:
+                name_known = normalized in _common_names_cache and _common_names_cache[normalized]
+                type_known = normalized in _object_types_cache
+                if not name_known and not type_known:
                     unknown_objects.add(obj)
     
     if not unknown_objects:
-        logger.info("All object common names found in cache, no API call needed")
+        logger.info("All object names and types found in cache, no API call needed")
         return
     
     logger.info(f"Querying SIMBAD for {len(unknown_objects)} unknown objects...")
     
-    # Query SIMBAD in batch
-    results = query_simbad_batch(list(unknown_objects))
+    # Query SIMBAD in batch — returns (names_dict, types_dict)
+    names_results, types_results = query_simbad_batch(list(unknown_objects))
     
-    # Update cache with results
-    if results:
-        _common_names_cache.update(results)
+    # Update common names cache
+    if names_results:
+        _common_names_cache.update(names_results)
         save_common_names_cache(_common_names_cache)
-        logger.info(f"Cached {len(results)} common names from SIMBAD")
+        logger.info(f"Cached {len(names_results)} common names from SIMBAD")
     else:
-        logger.warning("SIMBAD query returned no results")
+        logger.warning("SIMBAD query returned no common names")
+    
+    # Update object types cache
+    if types_results:
+        _object_types_cache.update(types_results)
+        save_object_types_cache(_object_types_cache)
+        logger.info(f"Cached {len(types_results)} object types from SIMBAD")
 
 
 def _deg_to_hms(ra_deg: float) -> str:
@@ -636,7 +945,7 @@ class AnalysisWindow(ctk.CTkToplevel):
 
                 # Build project summary headers with exposure and filter breakdown columns
                 project_base_headers = ['Project Name', 'Common Name (if known)', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
-                               'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count']
+                               'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count', 'Constellation']
                 project_exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_project_exposures]
                 project_filter_headers = [f'{filt} Filter Lights (count)' for filt in sorted_project_filters]
                 writer.writerow(project_base_headers + project_exposure_headers + project_filter_headers)
@@ -655,11 +964,17 @@ class AnalysisWindow(ctk.CTkToplevel):
                     total_integration_sec = project.get('integration_seconds', 0)
                     integration_hrs = total_integration_sec / 3600 if total_integration_sec else 0
                     session_count = len(project.get('sessions', []))
+                    sessions = project.get('sessions', [])
+                    # Get RA and Dec from first session
+                    session = sessions[0]
+                    ra = session[1] if len(session) > 1 else None
+                    dec = session[2] if len(session) > 2 else None
+                    constellation = get_constellation(ra, dec)
 
                     # Build base row
                     project_base_row = [
                         project_name, common_name, total_lights, total_darks, total_flats, total_bias,
-                        f"{integration_hrs:.2f}", total_integration_sec, session_count
+                        f"{integration_hrs:.2f}", total_integration_sec, session_count, constellation
                     ]
 
                     # Add exposure counts for each exposure time column at project level
@@ -1010,12 +1325,12 @@ class AnalysisWindow(ctk.CTkToplevel):
         unique_frame = ctk.CTkFrame(parent)
         unique_frame.pack(fill="x", padx=10, pady=(0, 10))
         
-        # Format unique objects with common names
+        # Format unique objects with common names or type
         object_texts = []
         for obj in stats['unique_objects']:
-            common = get_common_name(obj)
-            if common:
-                object_texts.append(f"{obj} ({common})")
+            label = get_display_label(obj)
+            if label:
+                object_texts.append(f"{obj} ({label})")
             else:
                 object_texts.append(obj)
         
@@ -1154,12 +1469,12 @@ class AnalysisWindow(ctk.CTkToplevel):
                 
                 # Objects row with common names
                 if all_objects:
-                    # Format objects with common names
+                    # Format objects with common names or type
                     loc_object_texts = []
                     for obj in sorted(all_objects):
-                        common = get_common_name(obj)
-                        if common:
-                            loc_object_texts.append(f"{obj} ({common})")
+                        label = get_display_label(obj)
+                        if label:
+                            loc_object_texts.append(f"{obj} ({label})")
                         else:
                             loc_object_texts.append(obj)
                     
@@ -1203,12 +1518,12 @@ class AnalysisWindow(ctk.CTkToplevel):
         # Format button text with common names if available
         objects = project.get('objects', set())
         if objects:
-            # Get common names for all objects in this project
+            # Get common names or types for all objects in this project
             obj_texts = []
             for obj in objects:
-                common = get_common_name(obj)
-                if common:
-                    obj_texts.append(f"{obj} ({common})")
+                label = get_display_label(obj)
+                if label:
+                    obj_texts.append(f"{obj} ({label})")
                 else:
                     obj_texts.append(obj)
             button_text = f"{project['name']}\n{', '.join(obj_texts)}"
@@ -1615,12 +1930,12 @@ class AnalysisWindow(ctk.CTkToplevel):
             objects_label = ctk.CTkLabel(summary_content, text="Objects", font=self.get_font(12, weight="bold"))
             objects_label.pack(anchor="w", padx=10, pady=(10, 5))
             
-            # Format objects with common names
+            # Format objects with common names or type
             object_texts = []
             for obj in project['objects']:
-                common = get_common_name(obj)
-                if common:
-                    object_texts.append(f"{obj} ({common})")
+                label = get_display_label(obj)
+                if label:
+                    object_texts.append(f"{obj} ({label})")
                 else:
                     object_texts.append(obj)
             
@@ -1661,9 +1976,9 @@ class AnalysisWindow(ctk.CTkToplevel):
         open_button.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Individual sessions expandable sections
-        # Session tuple: (obj_name, ra, dec, start, end, lights, integration, exposures, lights_by_exposure)
+        # Session tuple: (obj_name, ra, dec, start, end, lights, integration, exposures, lights_by_exposure, lights_by_filter)
         if project.get('sessions'):
-            for idx, (obj, ra, dec, start, end, lights, integration, exposures, lights_by_exposure) in enumerate(project['sessions']):
+            for idx, (obj, ra, dec, start, end, lights, integration, exposures, lights_by_exposure, lights_by_filter) in enumerate(project['sessions']):
                 session_frame = ctk.CTkFrame(self.details_scroll)
                 session_frame.pack(fill="x", padx=10, pady=5)
                 
@@ -1671,8 +1986,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                 session_content.pack(fill="x", padx=10, pady=(0, 10))
                 session_content.pack_forget()  # Initially collapsed
                 
-                # Format session button with common name
-                obj_common = get_common_name(obj)
+                # Format session button with common name or type
+                obj_common = get_display_label(obj)
                 obj_button_text = f"{obj} ({obj_common})" if obj_common else obj
                 session_button_text = f"▶ {obj_button_text} - Session {idx + 1}: {self._format_datetime(start)}"
                 session_button = ctk.CTkButton(
@@ -1741,8 +2056,8 @@ class AnalysisWindow(ctk.CTkToplevel):
                 object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=self.get_font(12, weight="bold"))
                 object_info_label.pack(anchor="w", padx=10, pady=(5, 2))
                 
-                # Object name with common name
-                obj_common = get_common_name(obj)
+                # Object name with common name or type
+                obj_common = get_display_label(obj)
                 obj_display = f"Name: {obj}" + (f" ({obj_common})" if obj_common else "")
                 obj_textbox = ctk.CTkTextbox(session_content, height=25)
                 obj_textbox.pack(fill="x", padx=10, pady=2)

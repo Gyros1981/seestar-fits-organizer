@@ -926,7 +926,8 @@ class SeestarApp(ctk.CTk):
                 'Planetary_video', 'Planetary_photo',
                 'Solar_video', 'Solar_photo',
                 'Scenery_video', 'Scenery_photo',
-                'Lunar_video', 'Lunar_photo'
+                'Lunar_video', 'Lunar_photo',
+                'MilkyWay'
             ]
             
             total_files = 0
@@ -1127,7 +1128,8 @@ class SeestarApp(ctk.CTk):
                  "• Planetary_video, Planetary_photo\n"
                  "• Solar_video, Solar_photo\n"
                  "• Lunar_video, Lunar_photo\n"
-                 "• Scenery_video, Scenery_photo\n\n"
+                 "• Scenery_video, Scenery_photo\n"
+                 "• MilkyWay\n\n"
                  "Files are only copied if they don't already exist at the destination (matching file size).",
             font=self.get_font(13),
             text_color=TEXT_MUTED,
