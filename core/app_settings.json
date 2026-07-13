@@ -6,5 +6,9 @@
   "text_scale": 1.4,
   "seestar_dir": "F:/MyWorks",
   "raw_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S50/Raw",
-  "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S50/Projects"
+  "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S50/Projects",
+  "analyze_dirs": [
+    "C:\\Users\\Guy\\Desktop\\Astrophotography\\Images\\Seestar S50\\Projects",
+    "C:\\Users\\Guy\\Desktop\\Astrophotography\\Images\\Seestar S30 Pro\\Projects"
+  ]
 }

@@ -37,6 +37,7 @@ class AppSettings:
             'seestar_dir': None,  # Most recently used Seestar directory
             'raw_dir': None,  # Most recently used Raw directory
             'projects_dir': None,  # Most recently used Projects directory
+            'analyze_dirs': [],  # List of directories to analyze
         }
         
         self._load_settings()
@@ -164,6 +165,7 @@ class AppSettings:
             'seestar_dir': None,  # Most recently used Seestar directory
             'raw_dir': None,  # Most recently used Raw directory
             'projects_dir': None,  # Most recently used Projects directory
+            'analyze_dirs': [],  # List of directories to analyze
         }
         self._save_settings()
         logger.info("Settings reset to defaults")
@@ -205,4 +207,17 @@ class AppSettings:
             directory: Directory path or None
         """
         self.settings['projects_dir'] = directory
+        self._save_settings()
+    
+    def get_analyze_dirs(self) -> list:
+        """Get the list of directories to analyze."""
+        return self.settings.get('analyze_dirs', [])
+    
+    def set_analyze_dirs(self, directories: list):
+        """Save the list of directories to analyze.
+        
+        Args:
+            directories: List of directory path strings
+        """
+        self.settings['analyze_dirs'] = [str(d) for d in directories]
         self._save_settings()

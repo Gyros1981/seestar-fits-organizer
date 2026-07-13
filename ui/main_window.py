@@ -108,12 +108,20 @@ class SeestarApp(ctk.CTk):
             if hasattr(self, 'projects_path_label'):
                 self.projects_path_label.configure(text=str(self.projects_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Loaded saved Projects directory: {self.projects_dir}")
-            
-            # Also pre-load into analyze dirs list for reuse
-            if not self.analyze_projects_dirs:
-                self.analyze_projects_dirs = [Path(projects_dir)]
-            if hasattr(self, 'analyze_dirs_listbox'):
-                self._refresh_analyze_dirs_list()
+        
+        # Load analyze dirs list (preferred) — fall back to projects_dir if list was never saved
+        saved_analyze_dirs = self.settings.get_analyze_dirs()
+        if saved_analyze_dirs:
+            self.analyze_projects_dirs = [Path(d) for d in saved_analyze_dirs if Path(d).exists()]
+            logger.info(f"Loaded {len(self.analyze_projects_dirs)} analyze directories from settings")
+        elif projects_dir and Path(projects_dir).exists():
+            # First-time migration: seed the list from the single saved projects dir
+            self.analyze_projects_dirs = [Path(projects_dir)]
+            self.settings.set_analyze_dirs(self.analyze_projects_dirs)
+            logger.info(f"Migrated projects_dir to analyze_dirs list")
+        
+        if self.analyze_projects_dirs and hasattr(self, 'analyze_dirs_listbox'):
+            self._refresh_analyze_dirs_list()
     
     def _create_menu_item(self, parent, text, font, command):
         """Create a traditional menu item button.
@@ -542,9 +550,8 @@ class SeestarApp(ctk.CTk):
             if path not in self.analyze_projects_dirs:
                 self.analyze_projects_dirs.append(path)
                 self._refresh_analyze_dirs_list()
+                self.settings.set_analyze_dirs(self.analyze_projects_dirs)
                 logger.info(f"Added analyze projects directory: {path}")
-                # Save last added to settings for reuse
-                self.settings.set_projects_dir(directory)
     
     def remove_analyze_projects_dir(self):
         """Remove the selected directory from the analysis list."""
@@ -553,6 +560,7 @@ class SeestarApp(ctk.CTk):
             idx = selection[0]
             removed = self.analyze_projects_dirs.pop(idx)
             self._refresh_analyze_dirs_list()
+            self.settings.set_analyze_dirs(self.analyze_projects_dirs)
             logger.info(f"Removed analyze projects directory: {removed}")
     
     def _refresh_analyze_dirs_list(self):
