@@ -34,6 +34,8 @@ class FitsMetadata:
         self.site: Optional[str] = None
         self.longitude: Optional[str] = None
         self.latitude: Optional[str] = None
+        # Telescope/instrument identification
+        self.instrument: Optional[str] = None
         
         self._extract_metadata()
     
@@ -66,6 +68,17 @@ class FitsMetadata:
                 self.focallen = self._get_float(header, 'FOCALLEN')
                 self.airmass = self._get_float(header, 'AIRMASS')
                 
+                # Telescope/instrument identification
+                # CREATOR is most reliable for Seestar scopes ("ZWO Seestar S50" etc.)
+                # INSTRUME sometimes contains the sensor chip name (e.g. "imx585") not the scope name,
+                # so only use INSTRUME when it actually identifies a telescope/scope.
+                creator = self._get_str(header, 'CREATOR')
+                instrume = self._get_str(header, 'INSTRUME')
+                if creator:
+                    self.instrument = creator
+                elif instrume:
+                    self.instrument = instrume
+
                 # Capture location (site)
                 self.site = (self._get_str(header, 'SITE') or
                            self._get_str(header, 'OBSERVAT') or
@@ -129,5 +142,6 @@ class FitsMetadata:
             'airmass': self.airmass,
             'site': self.site,
             'longitude': self.longitude,
-            'latitude': self.latitude
+            'latitude': self.latitude,
+            'instrument': self.instrument
         }

@@ -944,7 +944,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 sorted_project_filters = sorted(all_project_filters)
 
                 # Build project summary headers with exposure and filter breakdown columns
-                project_base_headers = ['Project Name', 'Common Name (if known)', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
+                project_base_headers = ['Project Name', 'Telescope', 'Common Name (if known)', 'Sky Map', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
                                'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count', 'Constellation']
                 project_exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_project_exposures]
                 project_filter_headers = [f'{filt} Filter Lights (count)' for filt in sorted_project_filters]
@@ -963,17 +963,32 @@ class AnalysisWindow(ctk.CTkToplevel):
                     total_bias = project.get('bias', 0)
                     total_integration_sec = project.get('integration_seconds', 0)
                     integration_hrs = total_integration_sec / 3600 if total_integration_sec else 0
-                    session_count = len(project.get('sessions', []))
                     sessions = project.get('sessions', [])
-                    # Get RA and Dec from first session
-                    session = sessions[0]
-                    ra = session[1] if len(session) > 1 else None
-                    dec = session[2] if len(session) > 2 else None
+                    session_count = len(sessions)
+                    # Get RA and Dec from first session if available
+                    ra = None
+                    dec = None
+                    if sessions:
+                        first_session = sessions[0]
+                        ra = first_session[1] if len(first_session) > 1 else None
+                        dec = first_session[2] if len(first_session) > 2 else None
                     constellation = get_constellation(ra, dec)
 
+                    telescope = project.get('telescope') or ''
+                    
+                    # Sky map hyperlink (Aladin Lite using RA/DEC from first session)
+                    if ra and dec:
+                        try:
+                            aladin_url = f'https://aladin.u-strasbg.fr/AladinLite/?target={float(ra):.5f}%20{float(dec):.5f}&fov=1.2&survey=CDS%2FP%2FDSS2%2Fcolor'
+                            sky_map_cell = f'=HYPERLINK("{aladin_url}","View in Aladin")'
+                        except (ValueError, TypeError):
+                            sky_map_cell = ''
+                    else:
+                        sky_map_cell = ''
+                    
                     # Build base row
                     project_base_row = [
-                        project_name, common_name, total_lights, total_darks, total_flats, total_bias,
+                        project_name, telescope, common_name, sky_map_cell, total_lights, total_darks, total_flats, total_bias,
                         f"{integration_hrs:.2f}", total_integration_sec, session_count, constellation
                     ]
 
@@ -1017,8 +1032,8 @@ class AnalysisWindow(ctk.CTkToplevel):
 
                 # Build dynamic headers with parenthetical explanations
                 base_headers = ['Project Name', 'Session Start (Local Time)', 'Session End (Local Time)', 'Session Duration (hrs)',
-                               'Object Name', 'Common Name (if known)', ra_header, dec_header, 'Constellation',
-                               'Shooting Location (Name)', 'Shooting Location (LAT in deg)', 'Shooting Location (LON in deg)',
+                               'Object Name', 'Common Name (if known)', 'Sky Map', ra_header, dec_header, 'Constellation',
+                               'Shooting Location (Name)', 'Shooting Location (LAT in deg)', 'Shooting Location (LON in deg)', 'Capture Location Map',
                                'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
                                'Total Integration Time (hrs)']
 
@@ -1083,11 +1098,28 @@ class AnalysisWindow(ctk.CTkToplevel):
                         # Get constellation
                         constellation = get_constellation(ra, dec)
 
+                        # Sky map hyperlink (Aladin Lite using session RA/DEC)
+                        if ra and dec:
+                            try:
+                                aladin_url = f'https://aladin.u-strasbg.fr/AladinLite/?target={float(ra):.5f}%20{float(dec):.5f}&fov=1.2&survey=CDS%2FP%2FDSS2%2Fcolor'
+                                sky_map_cell = f'=HYPERLINK("{aladin_url}","View in Aladin")'
+                            except (ValueError, TypeError):
+                                sky_map_cell = ''
+                        else:
+                            sky_map_cell = ''
+                        
+                        # Google Maps hyperlink for the capture location
+                        if lat and lat != 'N/A' and lon and lon != 'N/A':
+                            maps_url = f'https://maps.google.com/?q={lat},{lon}'
+                            maps_cell = f'=HYPERLINK("{maps_url}","View Map")'
+                        else:
+                            maps_cell = ''
+                        
                         # Build base row data
                         base_row = [
                             project_name, session_start, session_end, f"{duration_hrs:.2f}",
-                            obj_name, obj_common_name, ra_val, dec_val, constellation,
-                            location_name, lat, lon,
+                            obj_name, obj_common_name, sky_map_cell, ra_val, dec_val, constellation,
+                            location_name, lat, lon, maps_cell,
                             lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
                             f"{integration_hrs:.2f}"
                         ]
@@ -1247,11 +1279,31 @@ class AnalysisWindow(ctk.CTkToplevel):
         separator = ctk.CTkFrame(self.scroll_frame, height=2, fg_color="gray")
         separator.pack(fill="x", pady=(0, 10))
         
-        # Add project buttons
-        self.project_buttons = []
+        # Group projects by telescope, then render each group with a header
+        telescope_groups = {}
         for project in self.all_projects:
-            button = self.create_project_button(self.scroll_frame, project)
-            self.project_buttons.append((button, project))
+            scope = project.get('telescope') or 'Unknown Telescope'
+            telescope_groups.setdefault(scope, []).append(project)
+        
+        self.project_buttons = []
+        for scope_name in sorted(telescope_groups.keys()):
+            scope_projects = telescope_groups[scope_name]
+            
+            # Telescope header
+            scope_header = ctk.CTkLabel(
+                self.scroll_frame,
+                text=f"🔭 {scope_name}  ({len(scope_projects)} project{'s' if len(scope_projects) != 1 else ''})",
+                font=self.get_font(13, weight="bold"),
+                anchor="w"
+            )
+            scope_header.pack(fill="x", pady=(8, 2), padx=4)
+            
+            scope_sep = ctk.CTkFrame(self.scroll_frame, height=1, fg_color="gray50")
+            scope_sep.pack(fill="x", pady=(0, 4))
+            
+            for project in scope_projects:
+                button = self.create_project_button(self.scroll_frame, project)
+                self.project_buttons.append((button, project))
         
         # Project Details Frame (right side)
         details_frame = ctk.CTkFrame(main_frame)
@@ -1904,6 +1956,16 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_value.pack(fill="x", padx=10, pady=(0, 10))
         time_value.insert("1.0", f"{hours}h {minutes}m {seconds}s")
         time_value.configure(state="disabled", font=self.get_font(14))
+        
+        # Telescope
+        telescope = project.get('telescope')
+        if telescope:
+            scope_label = ctk.CTkLabel(summary_content, text="Telescope", font=self.get_font(12, weight="bold"))
+            scope_label.pack(anchor="w", padx=10, pady=(10, 5))
+            scope_value = ctk.CTkTextbox(summary_content, height=30)
+            scope_value.pack(fill="x", padx=10, pady=(0, 10))
+            scope_value.insert("1.0", telescope)
+            scope_value.configure(state="disabled", font=self.get_font(14))
         
         # File statistics
         file_label = ctk.CTkLabel(summary_content, text="File Statistics", font=self.get_font(12, weight="bold"))

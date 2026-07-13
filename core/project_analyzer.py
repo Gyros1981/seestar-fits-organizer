@@ -41,6 +41,9 @@ class ProjectAnalysis:
         self.site = None
         self.longitude = None
         self.latitude = None
+        # Telescope/instrument identification
+        self.telescope = None
+        self._instrument_counts = {}  # {instrument: count} for majority vote
         # Sessions (grouped by time gaps, per object)
         self.sessions = []  # List of (object, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure, lights_by_filter) tuples
     
@@ -66,6 +69,7 @@ class ProjectAnalysis:
             'site': self.site,
             'longitude': self.longitude,
             'latitude': self.latitude,
+            'telescope': self.telescope,
             'sessions': self.sessions
         }
 
@@ -269,6 +273,9 @@ class ProjectAnalyzer:
                         analysis.longitude = metadata.longitude
                     if analysis.latitude is None and metadata.latitude:
                         analysis.latitude = metadata.latitude
+                    # Tally instrument name for majority vote
+                    if metadata.instrument:
+                        analysis._instrument_counts[metadata.instrument] = analysis._instrument_counts.get(metadata.instrument, 0) + 1
                     
                     if metadata.object:
                         analysis.objects.add(metadata.object)
@@ -366,5 +373,9 @@ class ProjectAnalyzer:
                 all_timestamps.sort()
                 analysis.session_start = all_timestamps[0]
                 analysis.session_end = all_timestamps[-1]
+            
+            # Set telescope to the most common instrument value seen across all frames
+            if analysis._instrument_counts:
+                analysis.telescope = max(analysis._instrument_counts, key=analysis._instrument_counts.get)
         
         return analysis

@@ -5,6 +5,7 @@ Contains the main SeestarApp class for the Seestar FITS Organizer.
 """
 
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import filedialog, messagebox
 from pathlib import Path
 import threading
@@ -47,7 +48,7 @@ class SeestarApp(ctk.CTk):
         self.seestar_dir = None
         self.raw_dir = None
         self.projects_dir = None
-        self.analyze_projects_dir = None
+        self.analyze_projects_dirs = []  # List of project directories to analyze
         self.projects = []
         
         # Workflow configuration
@@ -108,10 +109,11 @@ class SeestarApp(ctk.CTk):
                 self.projects_path_label.configure(text=str(self.projects_dir), text_color=TEXT_PRIMARY)
             logger.info(f"Loaded saved Projects directory: {self.projects_dir}")
             
-            # Also load into analyze_projects_dir for reuse
-            self.analyze_projects_dir = Path(projects_dir)
-            if hasattr(self, 'analyze_projects_path_label'):
-                self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color=TEXT_PRIMARY)
+            # Also pre-load into analyze dirs list for reuse
+            if not self.analyze_projects_dirs:
+                self.analyze_projects_dirs = [Path(projects_dir)]
+            if hasattr(self, 'analyze_dirs_listbox'):
+                self._refresh_analyze_dirs_list()
     
     def _create_menu_item(self, parent, text, font, command):
         """Create a traditional menu item button.
@@ -533,14 +535,31 @@ class SeestarApp(ctk.CTk):
             self.settings.set_projects_dir(directory)
     
     def select_analyze_projects_dir(self):
-        """Select projects directory for analysis."""
-        directory = filedialog.askdirectory(title="Select Projects Directory for Analysis")
+        """Add a projects directory to the analysis list."""
+        directory = filedialog.askdirectory(title="Add Projects Directory for Analysis")
         if directory:
-            self.analyze_projects_dir = Path(directory)
-            self.analyze_projects_path_label.configure(text=str(self.analyze_projects_dir), text_color=TEXT_PRIMARY)
-            logger.info(f"Selected analyze projects directory: {self.analyze_projects_dir}")
-            # Also save to projects_dir setting for reuse
-            self.settings.set_projects_dir(directory)
+            path = Path(directory)
+            if path not in self.analyze_projects_dirs:
+                self.analyze_projects_dirs.append(path)
+                self._refresh_analyze_dirs_list()
+                logger.info(f"Added analyze projects directory: {path}")
+                # Save last added to settings for reuse
+                self.settings.set_projects_dir(directory)
+    
+    def remove_analyze_projects_dir(self):
+        """Remove the selected directory from the analysis list."""
+        selection = self.analyze_dirs_listbox.curselection()
+        if selection:
+            idx = selection[0]
+            removed = self.analyze_projects_dirs.pop(idx)
+            self._refresh_analyze_dirs_list()
+            logger.info(f"Removed analyze projects directory: {removed}")
+    
+    def _refresh_analyze_dirs_list(self):
+        """Refresh the listbox showing directories to analyze."""
+        self.analyze_dirs_listbox.delete(0, 'end')
+        for path in self.analyze_projects_dirs:
+            self.analyze_dirs_listbox.insert('end', str(path))
     
     def select_ps_source_dir(self):
         """Select Seestar MyWorks directory for Planetary & Scenery copy."""
@@ -590,8 +609,8 @@ class SeestarApp(ctk.CTk):
     
     def start_analysis(self):
         """Start analysis of existing projects."""
-        if not self.analyze_projects_dir:
-            messagebox.showerror("Error", "Please select Projects directory for analysis")
+        if not self.analyze_projects_dirs:
+            messagebox.showerror("Error", "Please add at least one Projects directory for analysis")
             return
         
         self.set_ui_state(False)
@@ -848,34 +867,39 @@ class SeestarApp(ctk.CTk):
     def analyze_projects(self):
         """Analyze existing projects and show results."""
         try:
-            # Scan for project folders
+            # Scan all configured directories for project folders
             project_folders = []
-            for item in self.analyze_projects_dir.iterdir():
-                if item.is_dir() and item.name.endswith('_Project'):
-                    project_folders.append(item)
-            
-            # Fallback: Look for any directory with FITS files
-            if not project_folders:
-                logger.info("No _Project folders found, scanning for directories with FITS files...")
-                for item in self.analyze_projects_dir.iterdir():
-                    if item.is_dir():
-                        has_fits = False
-                        for file in item.iterdir():
-                            if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
-                                has_fits = True
-                                break
-                            if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
-                                for subfile in file.iterdir():
-                                    if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
-                                        has_fits = True
-                                        break
-                                if has_fits:
+            for analyze_dir in self.analyze_projects_dirs:
+                dir_folders = []
+                for item in analyze_dir.iterdir():
+                    if item.is_dir() and item.name.endswith('_Project'):
+                        dir_folders.append(item)
+                
+                # Fallback: Look for any directory with FITS files
+                if not dir_folders:
+                    logger.info(f"No _Project folders found in {analyze_dir}, scanning for directories with FITS files...")
+                    for item in analyze_dir.iterdir():
+                        if item.is_dir():
+                            has_fits = False
+                            for file in item.iterdir():
+                                if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
+                                    has_fits = True
                                     break
-                        if has_fits:
-                            project_folders.append(item)
+                                if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                                    for subfile in file.iterdir():
+                                        if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
+                                            has_fits = True
+                                            break
+                                    if has_fits:
+                                        break
+                            if has_fits:
+                                dir_folders.append(item)
+                
+                project_folders.extend(dir_folders)
+                logger.info(f"Found {len(dir_folders)} project folders in {analyze_dir}")
             
             if not project_folders:
-                self.after(0, lambda: messagebox.showinfo("No Projects", "No project folders found in the selected directory."))
+                self.after(0, lambda: messagebox.showinfo("No Projects", "No project folders found in the selected directories."))
                 return
             
             # Show folder selection dialog
@@ -887,7 +911,8 @@ class SeestarApp(ctk.CTk):
                 self.after(0, lambda: self.hide_loading_spinner())
                 return
             
-            analyzer = ProjectAnalyzer(self.analyze_projects_dir)
+            # Use first dir as base for ProjectAnalyzer (it uses specific_folders so base doesn't matter)
+            analyzer = ProjectAnalyzer(self.analyze_projects_dirs[0])
             
             # Set up progress callback
             def progress_callback(current, total, percentage, message):
@@ -1088,18 +1113,50 @@ class SeestarApp(ctk.CTk):
         analyze_label = ctk.CTkLabel(self.analyze_frame, text="Analyze Existing Projects", font=self.get_font(16, weight="bold"))
         analyze_label.pack(anchor="w", padx=10, pady=(10, 10))
         
-        # Projects Directory (for analysis)
-        analyze_projects_label = ctk.CTkLabel(self.analyze_frame, text="Projects Directory:", font=self.get_font(13, weight="bold"))
+        # Projects Directories list
+        analyze_projects_label = ctk.CTkLabel(self.analyze_frame, text="Projects Directories:", font=self.get_font(13, weight="bold"))
         analyze_projects_label.pack(anchor="w", padx=10, pady=(0, 5))
         
-        analyze_projects_button_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
-        analyze_projects_button_frame.pack(fill="x", padx=10, pady=(0, 10))
+        # Listbox showing added directories
+        listbox_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
+        listbox_frame.pack(fill="x", padx=10, pady=(0, 5))
         
-        self.analyze_projects_path_label = ctk.CTkLabel(analyze_projects_button_frame, text="Not selected", text_color=TEXT_MUTED)
-        self.analyze_projects_path_label.pack(side="left", padx=(0, 10))
+        self.analyze_dirs_listbox = tk.Listbox(
+            listbox_frame,
+            height=4,
+            bg="#2b2b2b",
+            fg="#ffffff",
+            selectbackground="#1f538d",
+            selectforeground="#ffffff",
+            borderwidth=0,
+            highlightthickness=1,
+            highlightcolor="#555555",
+            highlightbackground="#555555",
+            font=("Segoe UI", 11)
+        )
+        self.analyze_dirs_listbox.pack(fill="x", side="left", expand=True)
         
-        self.analyze_projects_button = ctk.CTkButton(analyze_projects_button_frame, text="🌌 Browse", command=self.select_analyze_projects_dir, width=100, fg_color=SECONDARY, hover_color=SECONDARY_HOVER)
-        self.analyze_projects_button.pack(side="right")
+        # Add / Remove buttons
+        dir_btn_frame = ctk.CTkFrame(self.analyze_frame, fg_color="transparent")
+        dir_btn_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.analyze_projects_button = ctk.CTkButton(
+            dir_btn_frame, text="📁 Add Directory",
+            command=self.select_analyze_projects_dir,
+            width=140, fg_color=SECONDARY, hover_color=SECONDARY_HOVER
+        )
+        self.analyze_projects_button.pack(side="left", padx=(0, 5))
+        
+        remove_dir_btn = ctk.CTkButton(
+            dir_btn_frame, text="✕ Remove Selected",
+            command=self.remove_analyze_projects_dir,
+            width=140, fg_color=DANGER, hover_color=DANGER_HOVER
+        )
+        remove_dir_btn.pack(side="left")
+        
+        # Populate list if dirs already loaded
+        if self.analyze_projects_dirs:
+            self._refresh_analyze_dirs_list()
         
         # Start Button
         self.analyze_action_btn = ctk.CTkButton(
