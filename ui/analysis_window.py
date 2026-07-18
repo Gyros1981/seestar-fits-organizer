@@ -14,13 +14,14 @@ import platform
 import webbrowser
 import logging
 import os
+import threading
 from pathlib import Path
 from .preview_window import PreviewWindow
 from .object_names import (
     get_common_name, get_object_type, get_display_label,
     lookup_common_names_batch,
 )
-from .astro_utils import format_ra_dec, get_constellation
+from .astro_utils import format_duration, format_ra_dec, get_constellation
 from ui.theme import (
     ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, DANGER, DANGER_HOVER,
     NEUTRAL, NEUTRAL_HOVER, TEXT_MUTED,
@@ -58,18 +59,64 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.settings = settings
         self.location_tags = location_tags
         self.current_project = None  # Track currently selected project for view refresh
-        
-        # Pre-load common names for all objects so they're available in the UI
-        # This queries SIMBAD in batch for any unknown objects
-        lookup_common_names_batch(self.results['projects'])
-        
+        self._names_lookup_done = False  # Guards against duplicate SIMBAD lookups
+
+        # Build the UI immediately using whatever names are already cached, then
+        # query SIMBAD for any unknown objects in a background thread so the
+        # window never freezes waiting on the network.
         self.setup_ui()
-        
+
         # Bring window to front
         self.lift()
         self.attributes('-topmost', True)
-    
         self.after(100, lambda: self.attributes('-topmost', False))
+
+        # Kick off the (potentially slow) SIMBAD lookup off the main thread.
+        self._start_name_lookup()
+
+    def _start_name_lookup(self):
+        """Query SIMBAD for unknown object names/types in a background thread.
+
+        When finished, refreshes the currently displayed view on the main
+        thread so newly resolved common names appear without blocking the UI.
+        """
+        def worker():
+            try:
+                lookup_common_names_batch(self.results['projects'])
+            except Exception as e:
+                logger.warning(f"Background object-name lookup failed: {e}")
+            finally:
+                # Marshal the UI refresh back onto the Tk main thread.
+                try:
+                    self.after(0, self._on_name_lookup_complete)
+                except Exception:
+                    pass  # Window may have been closed already.
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+    def _on_name_lookup_complete(self):
+        """Refresh views after background name lookup finishes (main thread)."""
+        if self._names_lookup_done:
+            return
+        self._names_lookup_done = True
+        try:
+            self._refresh_object_labels()
+        except Exception as e:
+            logger.debug(f"Could not refresh object labels after lookup: {e}")
+
+    def _refresh_object_labels(self):
+        """Re-render the project list and details view with resolved names."""
+        # Re-render the (possibly filtered) project list.
+        if hasattr(self, 'search_entry') and self.search_entry.winfo_exists():
+            self.on_search_change(None)
+        # Re-render whichever details view is currently shown.
+        if self.current_project is not None:
+            self.show_project_details(self.current_project)
+        elif hasattr(self, 'details_scroll') and self.details_scroll.winfo_exists():
+            # Only refresh aggregate stats if it was the active view.
+            if getattr(self, '_aggregate_shown', False):
+                self.show_aggregate_stats()
     
     def get_font(self, size: int, weight: str = None):
         """Get a CTkFont with text scaling applied."""
@@ -118,7 +165,7 @@ class AnalysisWindow(ctk.CTkToplevel):
 
                 # Build project summary headers with exposure and filter breakdown columns
                 project_base_headers = ['Project Name', 'Telescope', 'Common Name (if known)', 'Sky Map', 'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
-                               'Total Integration Time (hrs)', 'Total Integration Time (sec)', 'Session Count', 'Constellation']
+                               'Total Integration Time (HH:MM:SS)', 'Total Integration Time (sec)', 'Session Count', 'Constellation']
                 project_exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_project_exposures]
                 project_filter_headers = [f'{filt} Filter Lights (count)' for filt in sorted_project_filters]
                 writer.writerow(project_base_headers + project_exposure_headers + project_filter_headers)
@@ -135,7 +182,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     total_flats = project.get('flats', 0)
                     total_bias = project.get('bias', 0)
                     total_integration_sec = project.get('integration_seconds', 0)
-                    integration_hrs = total_integration_sec / 3600 if total_integration_sec else 0
+                    integration_time = format_duration(total_integration_sec)
                     sessions = project.get('sessions', [])
                     session_count = len(sessions)
                     # Get RA and Dec from first session if available
@@ -162,7 +209,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                     # Build base row
                     project_base_row = [
                         project_name, telescope, common_name, sky_map_cell, total_lights, total_darks, total_flats, total_bias,
-                        f"{integration_hrs:.2f}", total_integration_sec, session_count, constellation
+                        integration_time, total_integration_sec, session_count, constellation
                     ]
 
                     # Add exposure counts for each exposure time column at project level
@@ -204,11 +251,11 @@ class AnalysisWindow(ctk.CTkToplevel):
                 sorted_session_filters = sorted(all_session_filters)
 
                 # Build dynamic headers with parenthetical explanations
-                base_headers = ['Project Name', 'Session Start (Local Time)', 'Session End (Local Time)', 'Session Duration (hrs)',
+                base_headers = ['Project Name', 'Telescope', 'Session Start (Local Time)', 'Session End (Local Time)', 'Session Duration (hrs)',
                                'Object Name', 'Common Name (if known)', 'Sky Map', ra_header, dec_header, 'Constellation',
                                'Shooting Location (Name)', 'Shooting Location (LAT in deg)', 'Shooting Location (LON in deg)', 'Capture Location Map',
                                'Total Lights (count)', 'Total Darks (count)', 'Total Flats (count)', 'Total Bias (count)',
-                               'Total Integration Time (hrs)']
+                               'Total Integration Time (HH:MM:SS)']
 
                 # Add exposure and filter breakdown columns
                 exposure_headers = [f'{int(exp)}s Exposures (count)' for exp in sorted_exposure_times]
@@ -217,6 +264,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 
                 for project in self.results['projects']:
                     project_name = project.get('name', 'Unknown')
+                    telescope = project.get('telescope') or ''
                     sessions = project.get('sessions', [])
                     
                     for session in sessions:
@@ -256,7 +304,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                             if tag and tag.get('name'):
                                 location_name = tag['name']
 
-                        integration_hrs = integration_sec / 3600 if integration_sec else 0
+                        integration_time = format_duration(integration_sec)
 
                         # Format dates
                         if session_start != 'N/A':
@@ -290,11 +338,11 @@ class AnalysisWindow(ctk.CTkToplevel):
                         
                         # Build base row data
                         base_row = [
-                            project_name, session_start, session_end, f"{duration_hrs:.2f}",
+                            project_name, telescope, session_start, session_end, f"{duration_hrs:.2f}",
                             obj_name, obj_common_name, sky_map_cell, ra_val, dec_val, constellation,
                             location_name, lat, lon, maps_cell,
                             lights, 0, 0, 0,  # darks, flats, bias are 0 for session-level
-                            f"{integration_hrs:.2f}"
+                            integration_time
                         ]
 
                         # Add exposure counts for each exposure time column
@@ -317,7 +365,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 writer.writerow(['Total Darks (count)', self.results['total_darks']])
                 writer.writerow(['Total Flats (count)', self.results['total_flats']])
                 writer.writerow(['Total Bias (count)', self.results['total_bias']])
-                writer.writerow(['Total Integration Time (hrs)', f"{self.results['total_integration_hours']:.2f}"])
+                writer.writerow(['Total Integration Time (HH:MM:SS)', format_duration(self.results['total_integration_seconds'])])
                 
                 # Calculate total sessions from project data
                 total_sessions = sum(len(project.get('sessions', [])) for project in self.results['projects'])
@@ -511,8 +559,7 @@ class AnalysisWindow(ctk.CTkToplevel):
             value_widget.configure(state="disabled", font=self.get_font(16))
         
         # Integration time
-        hours = int(stats['total_integration_hours'])
-        minutes = int((stats['total_integration_hours'] % 1) * 60)
+        integration_time = format_duration(stats['total_integration_seconds'])
         time_frame = ctk.CTkFrame(parent)
         time_frame.pack(fill="x", padx=10, pady=(0, 10))
         
@@ -521,7 +568,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         
         time_value = ctk.CTkTextbox(time_frame, height=35)
         time_value.pack(fill="x", padx=10, pady=(2, 10))
-        time_value.insert("1.0", f"{hours}h {minutes}m")
+        time_value.insert("1.0", integration_time)
         time_value.configure(state="disabled", font=self.get_font(16))
         
         # Unique objects and filters
@@ -801,6 +848,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         """Show aggregate statistics in the details panel."""
         # Clear current project tracking
         self.current_project = None
+        self._aggregate_shown = True
         
         # Reset the details label to show no specific project
         self.details_label.configure(text="Aggregate Statistics")
@@ -1045,6 +1093,7 @@ class AnalysisWindow(ctk.CTkToplevel):
         """Show detailed information for a selected project."""
         # Track the current project for refresh after tag edits
         self.current_project = project
+        self._aggregate_shown = False
         
         # Update details label with project name
         self.details_label.configure(text=f"Project Details - {project['name']}")
@@ -1118,13 +1167,11 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         total_seconds = project['integration_seconds']
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
+        integration_time = format_duration(total_seconds)
         
         time_value = ctk.CTkTextbox(summary_content, height=30)
         time_value.pack(fill="x", padx=10, pady=(0, 10))
-        time_value.insert("1.0", f"{hours}h {minutes}m {seconds}s")
+        time_value.insert("1.0", integration_time)
         time_value.configure(state="disabled", font=self.get_font(14))
         
         # Telescope
@@ -1362,10 +1409,7 @@ class AnalysisWindow(ctk.CTkToplevel):
                 lights_textbox.configure(state="disabled", font=self.get_font(14))
                 
                 if integration > 0:
-                    hours = int(integration // 3600)
-                    minutes = int((integration % 3600) // 60)
-                    seconds = int(integration % 60)
-                    integration_text = f"{hours}h {minutes}m {seconds}s"
+                    integration_text = format_duration(integration)
                     
                     integration_textbox = ctk.CTkTextbox(session_content, height=25)
                     integration_textbox.pack(fill="x", padx=10, pady=(0, 5))

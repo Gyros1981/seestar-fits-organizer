@@ -134,8 +134,16 @@ class AggregateAnalysis:
 class ProjectAnalyzer:
     """Analyzes existing projects in a directory."""
     
-    def __init__(self, projects_dir: Path):
+    def __init__(self, projects_dir: Path, session_gap_hours: float = 2.0):
+        """Create an analyzer.
+
+        Args:
+            projects_dir: Base directory to scan for projects.
+            session_gap_hours: Time gap (in hours) between consecutive frames of
+                the same object that marks the start of a new session.
+        """
         self.projects_dir = projects_dir
+        self.session_gap_hours = session_gap_hours
     
     def analyze_all(self, progress_callback=None, specific_folders=None) -> AggregateAnalysis:
         """Analyze all projects in the projects directory.
@@ -180,7 +188,7 @@ class ProjectAnalyzer:
                                 has_fits = True
                                 break
                             # Also check subfolders like lights/, darks/, etc.
-                            if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                            if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias', 'biases'):
                                 for subfile in file.iterdir():
                                     if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
                                         has_fits = True
@@ -298,9 +306,10 @@ class ProjectAnalyzer:
                 except Exception as e:
                     logger.warning(f"Failed to analyze {fits_path}: {e}")
             
-            # Group timestamps into sessions per object (gap > 2 hours = new session)
+            # Group timestamps into sessions per object.
+            # A gap larger than the configured threshold starts a new session.
             from datetime import datetime, timedelta
-            gap_threshold = timedelta(hours=2)
+            gap_threshold = timedelta(hours=self.session_gap_hours)
             
             for obj_name, timestamps in object_timestamps.items():
                 timestamps.sort()

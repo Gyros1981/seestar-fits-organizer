@@ -8,7 +8,7 @@ import customtkinter as ctk
 from pathlib import Path
 from typing import List
 
-from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER, TEXT_MUTED
+from ui.theme import BTN_PRIMARY, BTN_SECONDARY, BTN_NEUTRAL, TEXT_MUTED
 
 
 class FolderSelectionWindow(ctk.CTkToplevel):
@@ -86,8 +86,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             text="Select All",
             command=self.select_all,
             width=100,
-            fg_color=SECONDARY,
-            hover_color=SECONDARY_HOVER
+            **BTN_SECONDARY
         )
         select_all_btn.pack(side="left", padx=(0, 10))
         
@@ -96,8 +95,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             text="Deselect All",
             command=self.deselect_all,
             width=100,
-            fg_color=SECONDARY,
-            hover_color=SECONDARY_HOVER
+            **BTN_SECONDARY
         )
         deselect_all_btn.pack(side="left")
         
@@ -128,8 +126,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             text="Cancel",
             command=self.cancel,
             height=40,
-            fg_color=NEUTRAL,
-            hover_color=NEUTRAL_HOVER
+            **BTN_NEUTRAL
         )
         cancel_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
@@ -138,8 +135,7 @@ class FolderSelectionWindow(ctk.CTkToplevel):
             text="Process Selected",
             command=self.process,
             height=40,
-            fg_color=ACCENT,
-            hover_color=ACCENT_HOVER
+            **BTN_PRIMARY
         )
         process_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
     

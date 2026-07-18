@@ -34,6 +34,7 @@ class AppSettings:
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
             'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
+            'session_gap_hours': 2.0,  # Time gap (hours) between frames that starts a new session
             'seestar_dir': None,  # Most recently used Seestar directory
             'raw_dir': None,  # Most recently used Raw directory
             'projects_dir': None,  # Most recently used Projects directory
@@ -154,6 +155,29 @@ class AppSettings:
         self.settings['text_scale'] = scale
         self._save_settings()
     
+    def get_session_gap_hours(self) -> float:
+        """Get the session gap threshold in hours.
+        
+        Frames of the same object separated by more than this many hours
+        are treated as belonging to separate imaging sessions.
+        """
+        return self.settings.get('session_gap_hours', 2.0)
+    
+    def set_session_gap_hours(self, hours: float):
+        """Set the session gap threshold.
+        
+        Args:
+            hours: Gap threshold in hours (clamped to a minimum of 0.1)
+        """
+        try:
+            hours = float(hours)
+        except (ValueError, TypeError):
+            hours = 2.0
+        # Guard against zero/negative values that would split every frame.
+        hours = max(0.1, hours)
+        self.settings['session_gap_hours'] = hours
+        self._save_settings()
+    
     def reset_to_defaults(self):
         """Reset all settings to default values."""
         self.settings = {
@@ -162,6 +186,7 @@ class AppSettings:
             'disclaimer_acknowledged': False,  # Whether user has acknowledged the disclaimer
             'coordinate_format': 'degrees',  # 'degrees' or 'hms' (hours/minutes/seconds)
             'text_scale': 1.0,  # UI text scale factor (0.8 to 1.4)
+            'session_gap_hours': 2.0,  # Time gap (hours) between frames that starts a new session
             'seestar_dir': None,  # Most recently used Seestar directory
             'raw_dir': None,  # Most recently used Raw directory
             'projects_dir': None,  # Most recently used Projects directory

@@ -738,6 +738,13 @@ class SeestarApp(ctk.CTk):
                 
                 if file_type_counts:
                     selected_file_types = self._show_file_type_selection_dialog(file_type_counts)
+
+                    # If user cancelled file type selection, cancel the entire operation
+                    if selected_file_types is None:
+                        self.after(0, lambda: self.progress_label.configure(text="File type selection cancelled."))
+                        self.after(0, lambda: self.set_ui_state(True))
+                        self.after(0, lambda: self.hide_loading_spinner())
+                        return
                 
                 build_folders = selected_folders
             else:
@@ -893,7 +900,7 @@ class SeestarApp(ctk.CTk):
                                 if file.is_file() and file.suffix.lower() in ('.fits', '.fit'):
                                     has_fits = True
                                     break
-                                if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias'):
+                                if file.is_dir() and file.name.lower() in ('lights', 'darks', 'flats', 'bias', 'biases'):
                                     for subfile in file.iterdir():
                                         if subfile.is_file() and subfile.suffix.lower() in ('.fits', '.fit'):
                                             has_fits = True
@@ -920,7 +927,10 @@ class SeestarApp(ctk.CTk):
                 return
             
             # Use first dir as base for ProjectAnalyzer (it uses specific_folders so base doesn't matter)
-            analyzer = ProjectAnalyzer(self.analyze_projects_dirs[0])
+            analyzer = ProjectAnalyzer(
+                self.analyze_projects_dirs[0],
+                session_gap_hours=self.settings.get_session_gap_hours()
+            )
             
             # Set up progress callback
             def progress_callback(current, total, percentage, message):
@@ -2360,6 +2370,29 @@ class SeestarApp(ctk.CTk):
         )
         threshold_help.pack(anchor="w", padx=10, pady=(0, 10))
         
+        # Analysis Settings Section
+        analysis_frame = ctk.CTkFrame(scroll_frame)
+        analysis_frame.pack(fill="x", padx=5, pady=(0, 15))
+        
+        analysis_label = ctk.CTkLabel(analysis_frame, text="Analysis Settings", font=self.get_font(14, weight="bold"))
+        analysis_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # Session gap threshold
+        session_gap_label = ctk.CTkLabel(analysis_frame, text="Session Gap Threshold (hours):")
+        session_gap_label.pack(anchor="w", padx=10, pady=(5, 2))
+        
+        self.settings_session_gap_entry = ctk.CTkEntry(analysis_frame)
+        self.settings_session_gap_entry.pack(fill="x", padx=10, pady=(0, 5))
+        self.settings_session_gap_entry.insert("0", str(self.settings.get_session_gap_hours()))
+        
+        session_gap_help = ctk.CTkLabel(
+            analysis_frame,
+            text="Frames of the same target more than this many hours apart are counted as separate sessions (default: 2)",
+            font=self.get_font(10),
+            text_color=TEXT_MUTED
+        )
+        session_gap_help.pack(anchor="w", padx=10, pady=(0, 10))
+        
         # Timezone Settings Section
         timezone_frame = ctk.CTkFrame(scroll_frame)
         timezone_frame.pack(fill="x", padx=5, pady=(0, 15))
@@ -2519,6 +2552,10 @@ class SeestarApp(ctk.CTk):
             threshold = float(self.settings_threshold_entry.get())
             self.settings.set_location_threshold(threshold)
             
+            # Save session gap threshold
+            session_gap = float(self.settings_session_gap_entry.get())
+            self.settings.set_session_gap_hours(session_gap)
+            
             # Save timezone
             tz_value = self.settings_timezone_menu.get()
             logger.info(f"Saving timezone from menu value: {tz_value}")
@@ -2563,6 +2600,7 @@ class SeestarApp(ctk.CTk):
             "Are you sure you want to reset all settings to defaults?\n\n"
             "This will:\n"
             "• Reset location threshold to 0.005°\n"
+            "• Reset session gap threshold to 2 hours\n"
             "• Reset timezone to UTC\n"
             "• Reset coordinate format to Decimal Degrees\n"
             "• Reset text scale to Normal (1.0x)\n"
@@ -2579,6 +2617,9 @@ class SeestarApp(ctk.CTk):
                 # Update UI to reflect defaults
                 self.settings_threshold_entry.delete(0, "end")
                 self.settings_threshold_entry.insert(0, "0.005")
+                
+                self.settings_session_gap_entry.delete(0, "end")
+                self.settings_session_gap_entry.insert(0, "2.0")
                 
                 self.settings_timezone_menu.set("UTC")
                 

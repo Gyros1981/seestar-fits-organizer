@@ -5,8 +5,8 @@
   "coordinate_format": "degrees",
   "text_scale": 1.4,
   "seestar_dir": "F:/MyWorks",
-  "raw_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S50/Raw",
-  "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S50/Projects",
+  "raw_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S30 Pro/Raw",
+  "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S30 Pro/Projects",
   "analyze_dirs": [
     "C:\\Users\\Guy\\Desktop\\Astrophotography\\Images\\Seestar S50\\Projects",
     "C:\\Users\\Guy\\Desktop\\Astrophotography\\Images\\Seestar S30 Pro\\Projects"

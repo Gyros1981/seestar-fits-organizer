@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Set, List
 import logging
 
-from ui.theme import ACCENT, ACCENT_HOVER, SECONDARY, SECONDARY_HOVER, NEUTRAL, NEUTRAL_HOVER
+from ui.theme import BTN_PRIMARY, BTN_SECONDARY, BTN_NEUTRAL
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +95,8 @@ class FileTypeSelectionDialog(ctk.CTkToplevel):
             select_all_frame,
             text="Select All",
             width=100,
-            fg_color=SECONDARY,
-            hover_color=SECONDARY_HOVER,
-            command=self._select_all
+            command=self._select_all,
+            **BTN_SECONDARY
         )
         select_all_btn.pack(side="left", padx=(0, 5))
         
@@ -105,9 +104,8 @@ class FileTypeSelectionDialog(ctk.CTkToplevel):
             select_all_frame,
             text="Deselect All",
             width=120,
-            fg_color=SECONDARY,
-            hover_color=SECONDARY_HOVER,
-            command=self._deselect_all
+            command=self._deselect_all,
+            **BTN_SECONDARY
         )
         deselect_all_btn.pack(side="left", padx=5)
         
@@ -119,9 +117,8 @@ class FileTypeSelectionDialog(ctk.CTkToplevel):
             button_frame,
             text="Cancel",
             width=100,
-            fg_color=NEUTRAL,
-            hover_color=NEUTRAL_HOVER,
-            command=self._cancel
+            command=self._cancel,
+            **BTN_NEUTRAL
         )
         cancel_btn.pack(side="right", padx=5)
         
@@ -129,9 +126,8 @@ class FileTypeSelectionDialog(ctk.CTkToplevel):
             button_frame,
             text="Copy Selected",
             width=120,
-            fg_color=ACCENT,
-            hover_color=ACCENT_HOVER,
-            command=self._process
+            command=self._process,
+            **BTN_PRIMARY
         )
         process_btn.pack(side="right", padx=5)
     

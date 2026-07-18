@@ -9,6 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def format_duration(seconds) -> str:
+    try:
+        total_seconds = max(0, int(seconds or 0))
+    except (ValueError, TypeError):
+        total_seconds = 0
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
 def _deg_to_hms(ra_deg: float) -> str:
     """Convert RA from decimal degrees to HH:MM:SS.ss format."""
     if ra_deg is None:

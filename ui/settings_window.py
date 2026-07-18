@@ -314,12 +314,14 @@ class SettingsWindow(ctk.CTkToplevel):
             self.settings.set_location_threshold(threshold)
             
             # Save timezone
+            # NOTE: use startswith, not "in" — "PST (UTC-8)"/"EST (UTC-5)"
+            # both contain the substring "UTC" and would be misclassified.
             tz_value = self.timezone_menu.get()
-            if "UTC" in tz_value:
+            if tz_value.startswith("UTC"):
                 self.settings.set_timezone("UTC")
-            elif "EST" in tz_value:
+            elif tz_value.startswith("EST"):
                 self.settings.set_timezone("EST")
-            elif "Local" in tz_value:
+            elif tz_value.startswith("Local"):
                 self.settings.set_timezone("Local")
             else:
                 self.settings.set_timezone("PST")
