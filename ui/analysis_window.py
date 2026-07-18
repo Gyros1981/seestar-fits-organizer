@@ -571,32 +571,6 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_value.insert("1.0", integration_time)
         time_value.configure(state="disabled", font=self.get_font(16))
         
-        # Unique objects and filters
-        unique_frame = ctk.CTkFrame(parent)
-        unique_frame.pack(fill="x", padx=10, pady=(0, 10))
-        
-        # Format unique objects with common names or type
-        object_texts = []
-        for obj in stats['unique_objects']:
-            label = get_display_label(obj)
-            if label:
-                object_texts.append(f"{obj} ({label})")
-            else:
-                object_texts.append(obj)
-        
-        objects_text = f"Objects: {', '.join(object_texts)}" if object_texts else "Objects: None"
-        filters_text = f"Filters: {', '.join(stats['unique_filters'])}" if stats['unique_filters'] else "Filters: None"
-        
-        objects_textbox = ctk.CTkTextbox(unique_frame, height=30)
-        objects_textbox.pack(fill="x", padx=10, pady=(5, 2))
-        objects_textbox.insert("1.0", objects_text)
-        objects_textbox.configure(state="disabled", font=self.get_font(14))
-        
-        filters_textbox = ctk.CTkTextbox(unique_frame, height=30)
-        filters_textbox.pack(fill="x", padx=10, pady=(2, 10))
-        filters_textbox.insert("1.0", filters_text)
-        filters_textbox.configure(state="disabled", font=self.get_font(14))
-        
         # Capture Locations expandable section
         locations_frame = ctk.CTkFrame(parent)
         locations_frame.pack(fill="x", padx=10, pady=5)
@@ -960,6 +934,34 @@ class AnalysisWindow(ctk.CTkToplevel):
             logger.error(f"Failed to open image preview: {e}")
             messagebox.showerror("Error", f"Failed to open image preview: {str(e)}")
     
+    def _close_tag_dialog(self, dialog, success_message: str):
+        """Tear down the tag dialog, then refresh the details view.
+
+        The dialog holds a Tk ``grab_set``. Rebuilding the details panel while
+        that grab is still active (or mid-teardown) can leave the scrollable
+        frame blank, so we fully release the grab and destroy the dialog first,
+        then defer the refresh to a clean event-loop tick.
+        """
+        try:
+            dialog.grab_release()
+        except Exception:
+            pass
+        dialog.destroy()
+
+        messagebox.showinfo("Success", success_message, parent=self)
+
+        def refresh():
+            try:
+                if self.current_project:
+                    self.show_project_details(self.current_project)
+                else:
+                    self.show_aggregate_stats()
+            except Exception:
+                logger.exception("Failed to refresh details view after tag change")
+
+        # Defer so the destroyed dialog is fully gone before we rebuild.
+        self.after(0, refresh)
+
     def open_tag_dialog(self, lat: str, lon: str):
         """Open dialog to add/edit location tag."""
         tag = self.location_tags.get_tag(lat, lon)
@@ -1004,31 +1006,19 @@ class AnalysisWindow(ctk.CTkToplevel):
             notes = notes_textbox.get("1.0", "end").strip()
             
             if not name:
-                messagebox.showerror("Error", "Location name is required")
+                messagebox.showerror("Error", "Location name is required", parent=dialog)
                 return
             
             self.location_tags.set_tag(lat, lon, name, notes)
-            messagebox.showinfo("Success", "Location tag saved!")
-            dialog.destroy()
-            # Refresh the current view (project details or aggregate stats)
-            if self.current_project:
-                self.show_project_details(self.current_project)
-            else:
-                self.show_aggregate_stats()
+            self._close_tag_dialog(dialog, "Location tag saved!")
         
         def delete_tag():
             if tag:
-                if messagebox.askyesno("Confirm", "Delete this location tag?"):
+                if messagebox.askyesno("Confirm", "Delete this location tag?", parent=dialog):
                     self.location_tags.delete_tag(lat, lon)
-                    messagebox.showinfo("Success", "Location tag deleted!")
-                    dialog.destroy()
-                    # Refresh the current view (project details or aggregate stats)
-                    if self.current_project:
-                        self.show_project_details(self.current_project)
-                    else:
-                        self.show_aggregate_stats()
+                    self._close_tag_dialog(dialog, "Location tag deleted!")
             else:
-                messagebox.showinfo("Info", "No tag to delete")
+                messagebox.showinfo("Info", "No tag to delete", parent=dialog)
         
         save_button = ctk.CTkButton(
             button_frame,
