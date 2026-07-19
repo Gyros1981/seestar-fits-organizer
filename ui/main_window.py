@@ -848,9 +848,9 @@ class SeestarApp(ctk.CTk):
         card_data = [
             ("🔭", "Direct Import", "Copy FITS files straight from your Seestar into organized projects.", _direct_import),
             ("📁", "Intermediate Import", "Copy to a Raw folder first, then build projects from it.", _intermediate_import),
-            ("🌙", "Planetary & Scenery", "Copy Solar, Lunar, Planetary, and Scenery media.", lambda: self.show_mode('planetary_scenery')),
+            ("🌙", "Planetary & Scenery", "Copy Solar, Lunar, Planetary, Milky Way and Scenery media.", lambda: self.show_mode('planetary_scenery')),
             ("🪐", "Analyze Projects", "View integration time, frame counts, and session details.", lambda: self.show_mode('analyze')),
-            ("🖼️", "FITS Viewer", "Browse and preview FITS files with quality analysis.", lambda: self.show_mode('fits_viewer')),
+            ("📷", "FITS Viewer", "Browse and preview FITS files with quality analysis.", lambda: self.show_mode('fits_viewer')),
             ("⚙️", "Settings", "Configure timezone, coordinates, thresholds, and more.", lambda: self.show_mode('settings')),
         ]
 
@@ -2320,7 +2320,7 @@ class SeestarApp(ctk.CTk):
 
             self.planetary_scenery_frame,
 
-            text="Copy Solar, Lunar, Planetary, and Scenery images and videos from Seestar MyWorks to a target directory. "
+            text="Copy Solar, Lunar, Planetary, Milky Way and Scenery images and videos from Seestar MyWorks to a target directory. "
 
                  "This mode handles the non-FITS media files that are not part of the deep sky astrophotography workflow.\n\n"
 
@@ -5649,7 +5649,7 @@ class SeestarApp(ctk.CTk):
 
                  "• Intermediate Import - Copy to Raw folder first, then build projects\n"
 
-                 "• Planetary & Scenery Import - Copy Solar, Lunar, Planetary, and Scenery media\n"
+                 "• Planetary & Scenery Import - Copy Solar, Lunar, Planetary, Milky Way and Scenery media\n"
 
                  "• Project Analysis - View integration time, frame counts, and session details\n"
 

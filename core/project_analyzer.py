@@ -27,6 +27,27 @@ from .frame_classifier import FrameClassifier
 logger = logging.getLogger(__name__)
 
 
+# Seestar names every raw, unstacked sub-frame with one of these prefixes
+# (e.g. "Light_M 51_10.0s_IRCUT_20260510-212700.fit"). Processed/stacked
+# outputs use different names (e.g. "M_51_1106x30sec...fit", "stars_...fit"),
+# so filtering on these prefixes lets us skip processing artifacts regardless
+# of whether the user organizes files into lights/darks/flats/biases folders.
+RAW_FRAME_PREFIXES = ('light_', 'dark_', 'flat_', 'bias_')
+
+
+def is_raw_seestar_frame(filename: str) -> bool:
+    """Return True if the filename looks like a raw Seestar sub-frame.
+
+    Matches files whose name starts with a known raw frame prefix
+    (Light_/Dark_/Flat_/Bias_) and has a FITS extension. This excludes
+    processed/stacked outputs such as "stars_*.fit" or "M_51_*sec*.fit".
+    """
+    name = filename.lower()
+    if not (name.endswith('.fits') or name.endswith('.fit')):
+        return False
+    return name.startswith(RAW_FRAME_PREFIXES)
+
+
 
 
 
@@ -92,7 +113,7 @@ class ProjectAnalysis:
 
         # Sessions (grouped by time gaps, per object)
 
-        self.sessions = []  # List of (object, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure, lights_by_filter) tuples
+        self.sessions = []  # List of (object, ra, dec, start, end, lights, integration_seconds, exposures, lights_by_exposure, lights_by_filter, site, longitude, latitude) tuples
 
     
 
@@ -441,17 +462,31 @@ class ProjectAnalyzer:
 
         
 
-        # Find all FITS files in the project directory (recursively)
+        # Find all raw Seestar sub-frames in the project directory (recursively).
+        # We only include files whose names start with a raw frame prefix
+        # (Light_/Dark_/Flat_/Bias_) so that processed/stacked outputs
+        # (e.g. "stars_*.fit", "M_51_*sec*.fit") are skipped regardless of
+        # how the user has organized their folders.
 
         fits_files: List[Path] = []
+
+        skipped_files = 0
 
         for root, dirs, files in os.walk(project_path):
 
             for file in files:
 
-                if file.lower().endswith('.fits') or file.lower().endswith('.fit'):
+                if is_raw_seestar_frame(file):
 
                     fits_files.append(Path(root) / file)
+
+                elif file.lower().endswith('.fits') or file.lower().endswith('.fit'):
+
+                    skipped_files += 1
+
+        if skipped_files:
+
+            logger.info(f"{project_path.name}: skipped {skipped_files} non-raw FITS file(s) (processed/stacked outputs)")
 
         
 
@@ -463,7 +498,7 @@ class ProjectAnalyzer:
 
             object_timestamps = {}  # {object: [timestamps]}
 
-            object_session_data = {}  # {object: [(timestamp, exptime, is_light)]}
+            object_session_data = {}  # {object: [(timestamp, exptime, is_light, filter, site, longitude, latitude)]}
 
             object_coords = {}  # {object: (ra, dec)} - RA/DEC per object
 
@@ -585,7 +620,7 @@ class ProjectAnalyzer:
 
                                 object_session_data[metadata.object] = []
 
-                            object_session_data[metadata.object].append((metadata.date_obs, metadata.exptime, frame_type == 'LIGHT', metadata.filter))
+                            object_session_data[metadata.object].append((metadata.date_obs, metadata.exptime, frame_type == 'LIGHT', metadata.filter, metadata.site, metadata.longitude, metadata.latitude))
 
                     if metadata.filter:
 
@@ -629,19 +664,39 @@ class ProjectAnalyzer:
 
                 current_session_lights_by_filter = {}
 
+                current_session_site = None
+                current_session_longitude = None
+                current_session_latitude = None
+
+
                 
 
                 # Get all data for this object
 
                 obj_data = object_session_data.get(obj_name, [])
 
-                obj_data_dict = {ts: (exptime, is_light, filt) for ts, exptime, is_light, filt in obj_data}
+                obj_data_dict = {ts: (exptime, is_light, filt, site, longitude, latitude) for ts, exptime, is_light, filt, site, longitude, latitude in obj_data}
 
                 
 
                 # Get RA/DEC for this object
 
                 ra, dec = object_coords.get(obj_name, (None, None))
+
+                # Initialize session from first timestamp
+                first_data = obj_data_dict.get(timestamps[0])
+                if first_data:
+                    exptime, is_light, filt, current_session_site, current_session_longitude, current_session_latitude = first_data
+                    if is_light:
+                        current_session_lights += 1
+                        if filt:
+                            current_session_lights_by_filter[filt] = current_session_lights_by_filter.get(filt, 0) + 1
+                        if exptime:
+                            current_session_integration += exptime
+                            current_session_exposures.add(exptime)
+                            if exptime not in current_session_lights_by_exposure:
+                                current_session_lights_by_exposure[exptime] = 0
+                            current_session_lights_by_exposure[exptime] += 1
 
                 
 
@@ -665,7 +720,7 @@ class ProjectAnalyzer:
 
                                                   dict(sorted(current_session_lights_by_exposure.items())),
 
-                                                  dict(sorted(current_session_lights_by_filter.items()))))
+                                                  dict(sorted(current_session_lights_by_filter.items())), current_session_site, current_session_longitude, current_session_latitude))
 
                         # Start new session
 
@@ -683,6 +738,11 @@ class ProjectAnalyzer:
 
                         current_session_lights_by_filter = {}
 
+                        current_session_site = None
+                        current_session_longitude = None
+                        current_session_latitude = None
+
+
                     else:
 
                         # Extend current session
@@ -695,7 +755,14 @@ class ProjectAnalyzer:
 
                     if ts in obj_data_dict:
 
-                        exptime, is_light, filt = obj_data_dict[ts]
+                        exptime, is_light, filt, site, longitude, latitude = obj_data_dict[ts]
+
+                        if current_session_site is None and site:
+                            current_session_site = site
+                        if current_session_longitude is None and longitude:
+                            current_session_longitude = longitude
+                        if current_session_latitude is None and latitude:
+                            current_session_latitude = latitude
 
                         if is_light:
 
@@ -731,7 +798,7 @@ class ProjectAnalyzer:
 
                                           dict(sorted(current_session_lights_by_exposure.items())),
 
-                                          dict(sorted(current_session_lights_by_filter.items()))))
+                                          dict(sorted(current_session_lights_by_filter.items())), current_session_site, current_session_longitude, current_session_latitude))
 
             
 

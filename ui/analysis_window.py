@@ -553,10 +553,8 @@ class AnalysisWindow(ctk.CTkToplevel):
             label_widget = ctk.CTkLabel(stat_frame, text=label, font=self.get_font(12, weight="bold"))
             label_widget.pack(anchor="w", padx=10, pady=(10, 2))
             
-            value_widget = ctk.CTkTextbox(stat_frame, height=35)
-            value_widget.pack(fill="x", padx=10, pady=(2, 10))
-            value_widget.insert("1.0", str(value))
-            value_widget.configure(state="disabled", font=self.get_font(16))
+            value_widget = ctk.CTkLabel(stat_frame, text=str(value), font=self.get_font(16))
+            value_widget.pack(anchor="w", padx=10, pady=(2, 10))
         
         # Integration time
         integration_time = format_duration(stats['total_integration_seconds'])
@@ -566,10 +564,8 @@ class AnalysisWindow(ctk.CTkToplevel):
         time_label = ctk.CTkLabel(time_frame, text="Total Integration Time", font=self.get_font(12, weight="bold"))
         time_label.pack(anchor="w", padx=10, pady=(10, 2))
         
-        time_value = ctk.CTkTextbox(time_frame, height=35)
-        time_value.pack(fill="x", padx=10, pady=(2, 10))
-        time_value.insert("1.0", integration_time)
-        time_value.configure(state="disabled", font=self.get_font(16))
+        time_value = ctk.CTkLabel(time_frame, text=integration_time, font=self.get_font(16))
+        time_value.pack(anchor="w", padx=10, pady=(2, 10))
         
         # Capture Locations expandable section
         locations_frame = ctk.CTkFrame(parent)
@@ -818,6 +814,19 @@ class AnalysisWindow(ctk.CTkToplevel):
         self.project_buttons = []
         self._render_projects_grouped(filtered_projects)
     
+    def _scroll_details_to_top(self):
+        """Reset the details scroll frame back to the top.
+
+        Without this, switching from a long aggregate view to a project (or
+        vice versa) keeps the previous scroll offset and the new, shorter
+        content can appear blank.
+        """
+        try:
+            canvas = self.details_scroll._parent_canvas
+            self.after(0, lambda: canvas.yview_moveto(0.0))
+        except Exception:
+            pass
+
     def show_aggregate_stats(self):
         """Show aggregate statistics in the details panel."""
         # Clear current project tracking
@@ -841,6 +850,9 @@ class AnalysisWindow(ctk.CTkToplevel):
         
         # Create aggregate stats display
         self.create_aggregate_stats(self.details_scroll)
+
+        # Reset scroll position so the new content starts at the top
+        self._scroll_details_to_top()
     
     def open_file_explorer(self, path: str):
         """Open the given path in the system's file explorer."""
@@ -1080,350 +1092,328 @@ class AnalysisWindow(ctk.CTkToplevel):
             return datetime_str
     
     def show_project_details(self, project):
-        """Show detailed information for a selected project."""
-        # Track the current project for refresh after tag edits
+        '''Show detailed information for a selected project.'''
         self.current_project = project
         self._aggregate_shown = False
-        
+
         # Update details label with project name
         self.details_label.configure(text=f"Project Details - {project['name']}")
-        
+
         # Clear previous details
         for widget in self.details_scroll.winfo_children():
             widget.destroy()
-        
-        # Track expandable sections for accordion behavior
+
+        # Track expandable sections for session cards
         self.expandable_sections = []
-        
-        # Project summary (collapsible)
+
+        # Helper for consistent read-only info rows
+        def info_row(parent, label, value, value_color=None, small=False):
+            frame = ctk.CTkFrame(parent, fg_color="transparent")
+            frame.pack(fill="x", padx=10, pady=1)
+            label_widget = ctk.CTkLabel(frame, text=f"{label}: ", font=self.get_font(12, weight="bold"))
+            label_widget.pack(side="left")
+            font = self.get_font(11) if small else self.get_font(13)
+            kwargs = {"font": font, "wraplength": 700, "justify": "left"}
+            if value_color:
+                kwargs["text_color"] = value_color
+            value_widget = ctk.CTkLabel(frame, text=str(value), **kwargs)
+            value_widget.pack(side="left", fill="x", expand=True, padx=(3, 0))
+            return frame
+
+        # ------------------------------------------------------------------
+        # Hero summary card
+        # ------------------------------------------------------------------
         summary_frame = ctk.CTkFrame(self.details_scroll)
-        summary_frame.pack(fill="x", padx=10, pady=5)
-        
-        summary_button = ctk.CTkButton(
+        summary_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+        # Title row: project name + open folder
+        title_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
+        title_frame.pack(fill="x", padx=10, pady=(10, 5))
+
+        name_label = ctk.CTkLabel(
+            title_frame,
+            text=project.get('name', 'Unknown'),
+            font=self.get_font(18, weight="bold")
+        )
+        name_label.pack(side="left")
+
+        open_btn = ctk.CTkButton(
+            title_frame,
+            text="Open in File Explorer",
+            width=140,
+            height=28,
+            command=lambda p=project.get('path', ''): self.open_file_explorer(p)
+        )
+        open_btn.pack(side="right")
+
+        # Total integration time (hero metric)
+        integration_seconds = project.get('integration_seconds', 0)
+        integration_time = format_duration(integration_seconds)
+
+        hero_label = ctk.CTkLabel(
             summary_frame,
-            text="▶ Project Summary",
-            font=self.get_font(12, weight="bold"),
-            height=35,
-            command=lambda: self.toggle_expandable_section(summary_button, summary_content)
+            text="Total Integration Time",
+            font=self.get_font(12, weight="bold")
         )
-        summary_button.pack(fill="x", padx=10, pady=(10, 5))
-        
-        summary_content = ctk.CTkFrame(summary_frame)
-        summary_content.pack(fill="x", padx=10, pady=(0, 10))
-        summary_content.pack_forget()  # Initially collapsed
-        
-        # Track this section for accordion behavior
-        self.expandable_sections.append((summary_button, summary_content))
-        
-        # Frame counts
-        counts_label = ctk.CTkLabel(summary_content, text="Frame Counts", font=self.get_font(12, weight="bold"))
-        counts_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        counts_text = (
-            f"Lights: {project['lights']} | "
-            f"Darks: {project['darks']} | "
-            f"Flats: {project['flats']} | "
-            f"Bias: {project['bias']}"
+        hero_label.pack(anchor="w", padx=10, pady=(10, 0))
+
+        hero_value = ctk.CTkLabel(
+            summary_frame,
+            text=integration_time,
+            font=self.get_font(22, weight="bold")
         )
-        counts_value = ctk.CTkTextbox(summary_content, height=30)
-        counts_value.pack(fill="x", padx=10, pady=(0, 5))
-        counts_value.insert("1.0", counts_text)
-        counts_value.configure(state="disabled", font=self.get_font(14))
-        
-        # Exposure breakdown for lights
-        if project.get('lights_by_exposure'):
-            lights_exp_label = ctk.CTkLabel(summary_content, text="Lights by Exposure:", font=self.get_font(12, weight="bold"))
-            lights_exp_label.pack(anchor="w", padx=10, pady=(5, 2))
-            
-            for exp, count in sorted(project['lights_by_exposure'].items()):
-                exp_textbox = ctk.CTkTextbox(summary_content, height=25)
-                exp_textbox.pack(fill="x", padx=10, pady=1)
-                exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                exp_textbox.configure(state="disabled", font=self.get_font(12))
-        
-        # Exposure breakdown for darks
-        if project.get('darks_by_exposure'):
-            darks_exp_label = ctk.CTkLabel(summary_content, text="Darks by Exposure:", font=self.get_font(12, weight="bold"))
-            darks_exp_label.pack(anchor="w", padx=10, pady=(5, 2))
-            
-            for exp, count in sorted(project['darks_by_exposure'].items()):
-                exp_textbox = ctk.CTkTextbox(summary_content, height=25)
-                exp_textbox.pack(fill="x", padx=10, pady=1)
-                exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                exp_textbox.configure(state="disabled", font=self.get_font(12))
-        
-        # Integration time
-        time_label = ctk.CTkLabel(summary_content, text="Total Integration Time", font=self.get_font(12, weight="bold"))
-        time_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        total_seconds = project['integration_seconds']
-        integration_time = format_duration(total_seconds)
-        
-        time_value = ctk.CTkTextbox(summary_content, height=30)
-        time_value.pack(fill="x", padx=10, pady=(0, 10))
-        time_value.insert("1.0", integration_time)
-        time_value.configure(state="disabled", font=self.get_font(14))
-        
+        hero_value.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # Frame count chips
+        chips_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
+        chips_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+        chip_data = [
+            ("🌟", "Lights", project.get('lights', 0), ACCENT),
+            ("🌑", "Darks", project.get('darks', 0), SECONDARY),
+            ("⬜", "Flats", project.get('flats', 0), NEUTRAL),
+            ("⚫", "Bias", project.get('bias', 0), TEXT_MUTED),
+        ]
+        for emoji, label, count, color in chip_data:
+            if count > 0:
+                chip = ctk.CTkLabel(
+                    chips_frame,
+                    text=f"{emoji} {count} {label}",
+                    font=self.get_font(12, weight="bold"),
+                    text_color=color
+                )
+                chip.pack(side="left", padx=(0, 15))
+
+        # Target coordinates section (sky target location is the same across sessions)
+        sessions = project.get('sessions', [])
+        if sessions:
+            target_objects = {}
+            for s in sessions:
+                obj_name = s[0]
+                ra = s[1]
+                dec = s[2]
+                if obj_name and obj_name not in target_objects and ra is not None and dec is not None:
+                    target_objects[obj_name] = (ra, dec)
+
+            if target_objects:
+                target_header = ctk.CTkLabel(
+                    summary_frame,
+                    text="Target",
+                    font=self.get_font(12, weight="bold")
+                )
+                target_header.pack(anchor="w", padx=10, pady=(10, 2))
+
+                for obj_name, (ra, dec) in sorted(target_objects.items()):
+                    target_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
+                    target_frame.pack(fill="x", padx=10, pady=1)
+
+                    obj_common = get_display_label(obj_name)
+                    obj_text = f"{obj_name}" + (f" ({obj_common})" if obj_common else "")
+                    coord_format = self.settings.get_coordinate_format()
+                    ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
+                    constellation = get_constellation(ra, dec)
+                    coord_text = f"RA: {ra_val}, DEC: {dec_val}"
+                    if constellation and constellation != 'Unknown':
+                        coord_text += f" · {constellation}"
+
+                    obj_label = ctk.CTkLabel(
+                        target_frame,
+                        text=f"{obj_text}: {coord_text}",
+                        font=self.get_font(11),
+                        wraplength=700,
+                        justify="left"
+                    )
+                    obj_label.pack(side="left", fill="x", expand=True)
+
+                    sky_btn = ctk.CTkButton(
+                        target_frame,
+                        text="Sky Atlas",
+                        width=80,
+                        height=24,
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
+                        command=lambda r=ra, d=dec, name=obj_name: self.open_sky_atlas(r, d, name)
+                    )
+                    sky_btn.pack(side="right")
+
+        # Object list
+        if project.get('objects'):
+            object_texts = []
+            for obj in project.get('objects'):
+                label = get_display_label(obj)
+                object_texts.append(f"{obj} ({label})" if label else obj)
+            info_row(summary_frame, "Objects", ", ".join(object_texts))
+
+        # Filter list
+        if project.get('filters'):
+            info_row(summary_frame, "Filters", ", ".join(project['filters']))
+
         # Telescope
         telescope = project.get('telescope')
         if telescope:
-            scope_label = ctk.CTkLabel(summary_content, text="Telescope", font=self.get_font(12, weight="bold"))
-            scope_label.pack(anchor="w", padx=10, pady=(10, 5))
-            scope_value = ctk.CTkTextbox(summary_content, height=30)
-            scope_value.pack(fill="x", padx=10, pady=(0, 10))
-            scope_value.insert("1.0", telescope)
-            scope_value.configure(state="disabled", font=self.get_font(14))
-        
+            info_row(summary_frame, "Telescope", telescope, small=True)
+
         # File statistics
-        file_label = ctk.CTkLabel(summary_content, text="File Statistics", font=self.get_font(12, weight="bold"))
-        file_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        file_text = f"{project['total_files']} files | {project['total_size_mb']:.2f} MB"
-        file_value = ctk.CTkTextbox(summary_content, height=30)
-        file_value.pack(fill="x", padx=10, pady=(0, 10))
-        file_value.insert("1.0", file_text)
-        file_value.configure(state="disabled", font=self.get_font(14))
-        
-        # Filters
-        if project['filters']:
-            filter_label = ctk.CTkLabel(summary_content, text="Filters", font=self.get_font(12, weight="bold"))
-            filter_label.pack(anchor="w", padx=10, pady=(10, 5))
-            
-            filter_textbox = ctk.CTkTextbox(summary_content, height=30)
-            filter_textbox.pack(fill="x", padx=10, pady=(0, 10))
-            filter_textbox.insert("1.0", ', '.join(project['filters']))
-            filter_textbox.configure(state="disabled", font=self.get_font(14))
-        
-        # Objects with common names
-        if project['objects']:
-            objects_label = ctk.CTkLabel(summary_content, text="Objects", font=self.get_font(12, weight="bold"))
-            objects_label.pack(anchor="w", padx=10, pady=(10, 5))
-            
-            # Format objects with common names or type
-            object_texts = []
-            for obj in project['objects']:
-                label = get_display_label(obj)
-                if label:
-                    object_texts.append(f"{obj} ({label})")
-                else:
-                    object_texts.append(obj)
-            
-            objects_text = ', '.join(object_texts)
-            objects_textbox = ctk.CTkTextbox(summary_content, height=30)
-            objects_textbox.pack(fill="x", padx=10, pady=(0, 10))
-            objects_textbox.insert("1.0", objects_text)
-            objects_textbox.configure(state="disabled", font=self.get_font(14))
-        
-        # Exposures
-        if project['exposures']:
-            exp_label = ctk.CTkLabel(summary_content, text="Exposure Times", font=self.get_font(12, weight="bold"))
-            exp_label.pack(anchor="w", padx=10, pady=(10, 5))
-            
-            exp_text = ', '.join([f"{e}s" for e in project['exposures']])
-            exp_textbox = ctk.CTkTextbox(summary_content, height=30)
-            exp_textbox.pack(fill="x", padx=10, pady=(0, 10))
-            exp_textbox.insert("1.0", exp_text)
-            exp_textbox.configure(state="disabled", font=self.get_font(14))
-        
-        # Path
-        path_label = ctk.CTkLabel(summary_content, text="Project Path", font=self.get_font(12, weight="bold"))
-        path_label.pack(anchor="w", padx=10, pady=(10, 5))
-        
-        path_textbox = ctk.CTkTextbox(summary_content, height=30)
-        path_textbox.pack(fill="x", padx=10, pady=(0, 5))
-        path_textbox.insert("1.0", project['path'])
-        path_textbox.configure(state="disabled", font=self.get_font(12), text_color=TEXT_MUTED)
-        
-        # Open in File Explorer button
-        open_button = ctk.CTkButton(
-            summary_content,
-            text="📂 Open in File Explorer",
-            font=self.get_font(12),
-            height=32,
-            command=lambda: self.open_file_explorer(project['path'])
-        )
-        open_button.pack(anchor="w", padx=10, pady=(0, 10))
-        
-        # Individual sessions expandable sections
-        # Session tuple: (obj_name, ra, dec, start, end, lights, integration, exposures, lights_by_exposure, lights_by_filter)
-        if project.get('sessions'):
-            for idx, (obj, ra, dec, start, end, lights, integration, exposures, lights_by_exposure, lights_by_filter) in enumerate(project['sessions']):
-                session_frame = ctk.CTkFrame(self.details_scroll)
-                session_frame.pack(fill="x", padx=10, pady=5)
-                
-                session_content = ctk.CTkFrame(session_frame)
-                session_content.pack(fill="x", padx=10, pady=(0, 10))
-                session_content.pack_forget()  # Initially collapsed
-                
-                # Format session button with common name or type
+        file_text = f"{project.get('total_files', 0)} files · {project.get('total_size_mb', 0):.2f} MB"
+        info_row(summary_frame, "Files", file_text, small=True)
+
+        # Project path
+        info_row(summary_frame, "Path", project.get('path', ''), small=True)
+
+        # ------------------------------------------------------------------
+        # Sessions list
+        # ------------------------------------------------------------------
+        if sessions:
+            sessions_header = ctk.CTkLabel(
+                self.details_scroll,
+                text="Sessions",
+                font=self.get_font(14, weight="bold")
+            )
+            sessions_header.pack(anchor="w", padx=10, pady=(15, 5))
+
+            # Sort chronologically by session start time
+            sorted_sessions = sorted(
+                sessions,
+                key=lambda s: (s[3] is None, s[3] or '')
+            )
+
+            # Only label sessions with the object name when a project has
+            # more than one object (each project is normally a single object,
+            # which already lives in the hero card).
+            multi_object = len(project.get('objects', []) or []) > 1
+
+            for idx, (obj, ra, dec, start, end, lights, integration, exposures, lights_by_exposure, lights_by_filter, site, longitude, latitude) in enumerate(sorted_sessions, 1):
                 obj_common = get_display_label(obj)
-                obj_button_text = f"{obj} ({obj_common})" if obj_common else obj
-                session_button_text = f"▶ {obj_button_text} - Session {idx + 1}: {self._format_datetime(start)}"
+                obj_display = f"{obj} ({obj_common})" if obj_common else obj
+
+                start_str = self._format_datetime(start) if start else 'N/A'
+                end_str = self._format_datetime(end) if end else 'N/A'
+
+                # Session span and integration
+                span_text = ""
+                if start and end:
+                    try:
+                        span_seconds = (datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds()
+                        span_text = format_duration(span_seconds)
+                    except Exception:
+                        pass
+
+                int_text = format_duration(integration) if integration and integration > 0 else ""
+
+                # Build a concise button header
+                header_parts = [obj_display] if multi_object else []
+                if lights:
+                    header_parts.append(f"{lights} lights")
+                if int_text:
+                    header_parts.append(int_text)
+                if lights_by_exposure:
+                    exposure_summary = ", ".join(
+                        f"{int(exp)}s×{count}" for exp, count in sorted(lights_by_exposure.items())
+                    )
+                    if exposure_summary:
+                        header_parts.append(exposure_summary)
+
+                button_text = f"▶ Session {idx}: {' · '.join(header_parts)} · {start_str}"
+
+                session_frame = ctk.CTkFrame(self.details_scroll)
+                session_frame.pack(fill="x", padx=10, pady=3)
+
                 session_button = ctk.CTkButton(
                     session_frame,
-                    text=session_button_text,
+                    text=button_text,
                     font=self.get_font(12),
-                    height=35
+                    height=35,
+                    anchor="w"
                 )
-                session_button.pack(fill="x", padx=10, pady=(10, 5))
-                session_button.configure(command=lambda btn=session_button, content=session_content: self.toggle_expandable_section(btn, content))
-                
-                # Track this section for accordion behavior
+                session_button.pack(fill="x")
+
+                session_content = ctk.CTkFrame(session_frame)
+                session_content.pack(fill="x", padx=10, pady=(0, 10))
+                session_content.pack_forget()
+
+                session_button.configure(
+                    command=lambda btn=session_button, content=session_content: self.toggle_expandable_section(btn, content)
+                )
                 self.expandable_sections.append((session_button, session_content))
-                
-                # Session details - Capture Location section (first)
-                if project.get('latitude') and project.get('longitude'):
-                    location_label = ctk.CTkLabel(session_content, text="Capture Location:", font=self.get_font(12, weight="bold"))
-                    location_label.pack(anchor="w", padx=10, pady=(5, 2))
-                    
-                    tag = self.location_tags.get_tag(str(project['latitude']), str(project['longitude']))
-                    if tag:
-                        location_textbox = ctk.CTkTextbox(session_content, height=25)
-                        location_textbox.pack(fill="x", padx=10, pady=(0, 2))
-                        location_textbox.insert("1.0", f"⭐ {tag['name']}")
-                        location_textbox.configure(state="disabled", font=self.get_font(14))
-                    
-                    # Site
-                    if project.get('site'):
-                        site_textbox = ctk.CTkTextbox(session_content, height=25)
-                        site_textbox.pack(fill="x", padx=10, pady=2)
-                        site_textbox.insert("1.0", f"Site: {project['site']}")
-                        site_textbox.configure(state="disabled", font=self.get_font(14))
-                    
-                    # Coordinates
-                    coord_textbox = ctk.CTkTextbox(session_content, height=25)
-                    coord_textbox.pack(fill="x", padx=10, pady=(0, 5))
-                    coord_textbox.insert("1.0", f"Lat: {project['latitude']}, Lon: {project['longitude']}")
-                    coord_textbox.configure(state="disabled", font=self.get_font(14))
-                    
-                    # Tag button
-                    tag_button_text = "✏️ Edit Tag" if tag else "➕ Add Tag"
-                    tag_button = ctk.CTkButton(
-                        session_content,
-                        text=tag_button_text,
-                        font=self.get_font(12),
-                        height=32,
-                        fg_color=SECONDARY,
-                        hover_color=SECONDARY_HOVER,
-                        command=lambda l=project['latitude'], ln=project['longitude']: self.open_tag_dialog(str(l), str(ln))
-                    )
-                    tag_button.pack(fill="x", padx=10, pady=(0, 5))
-                    
-                    # Google Maps button
-                    maps_button = ctk.CTkButton(
-                        session_content,
-                        text="🗺️ Open in Google Maps",
-                        font=self.get_font(12),
-                        height=32,
-                        fg_color=SECONDARY,
-                        hover_color=SECONDARY_HOVER,
-                        command=lambda l=project['latitude'], ln=project['longitude']: self.open_google_maps(str(l), str(ln))
-                    )
-                    maps_button.pack(fill="x", padx=10, pady=(0, 10))
-                
-                # Object Information section
-                object_info_label = ctk.CTkLabel(session_content, text="Object Information:", font=self.get_font(12, weight="bold"))
-                object_info_label.pack(anchor="w", padx=10, pady=(5, 2))
-                
-                # Object name with common name or type
-                obj_common = get_display_label(obj)
-                obj_display = f"Name: {obj}" + (f" ({obj_common})" if obj_common else "")
-                obj_textbox = ctk.CTkTextbox(session_content, height=25)
-                obj_textbox.pack(fill="x", padx=10, pady=2)
-                obj_textbox.insert("1.0", obj_display)
-                obj_textbox.configure(state="disabled", font=self.get_font(14))
-                
-                # RA/DEC coordinates
-                if ra or dec:
-                    # Use coordinate format setting for display
-                    coord_format = self.settings.get_coordinate_format()
-                    ra_val, dec_val = format_ra_dec(ra, dec, coord_format)
-                    coords_textbox = ctk.CTkTextbox(session_content, height=25)
-                    coords_textbox.pack(fill="x", padx=10, pady=2)
-                    coords_textbox.insert("1.0", f"RA: {ra_val}, DEC: {dec_val}")
-                    coords_textbox.configure(state="disabled", font=self.get_font(14))
-                    
-                    # Constellation
-                    constellation = get_constellation(ra, dec)
-                    if constellation and constellation != 'Unknown':
-                        const_textbox = ctk.CTkTextbox(session_content, height=25)
-                        const_textbox.pack(fill="x", padx=10, pady=2)
-                        const_textbox.insert("1.0", f"Constellation: {constellation}")
-                        const_textbox.configure(state="disabled", font=self.get_font(14))
-                    
-                    # Sky Atlas button - Open Aladin Lite with object coordinates
-                    sky_button = ctk.CTkButton(
-                        session_content,
-                        text="🔭 Open in Sky Atlas (Aladin)",
-                        font=self.get_font(12),
-                        height=32,
-                        fg_color=SECONDARY,
-                        hover_color=SECONDARY_HOVER,
-                        command=lambda r=ra, d=dec, name=obj: self.open_sky_atlas(r, d, name)
-                    )
-                    sky_button.pack(fill="x", padx=10, pady=(0, 5))
-                    
-                    # Preview Image button
-                    preview_button = ctk.CTkButton(
-                        session_content,
-                        text="🔍 Preview Image",
-                        font=self.get_font(12),
-                        height=32,
-                        fg_color=SECONDARY,
-                        hover_color=SECONDARY_HOVER,
-                        command=lambda p=project, o=obj: self.open_image_preview(p, o)
-                    )
-                    preview_button.pack(fill="x", padx=10, pady=(0, 10))
-                
-                # Time section
-                time_label = ctk.CTkLabel(session_content, text="Time:", font=self.get_font(12, weight="bold"))
-                time_label.pack(anchor="w", padx=10, pady=(5, 2))
-                
-                start_textbox = ctk.CTkTextbox(session_content, height=25)
-                start_textbox.pack(fill="x", padx=10, pady=2)
-                start_textbox.insert("1.0", f"Start: {self._format_datetime(start)}")
-                start_textbox.configure(state="disabled", font=self.get_font(14))
-                
-                end_textbox = ctk.CTkTextbox(session_content, height=25)
-                end_textbox.pack(fill="x", padx=10, pady=(0, 5))
-                end_textbox.insert("1.0", f"End: {self._format_datetime(end)}")
-                end_textbox.configure(state="disabled", font=self.get_font(14))
-                
-                # Captures section
-                captures_label = ctk.CTkLabel(session_content, text="Captures:", font=self.get_font(12, weight="bold"))
-                captures_label.pack(anchor="w", padx=10, pady=(5, 2))
-                
-                lights_textbox = ctk.CTkTextbox(session_content, height=25)
-                lights_textbox.pack(fill="x", padx=10, pady=2)
-                lights_textbox.insert("1.0", f"Lights: {lights}")
-                lights_textbox.configure(state="disabled", font=self.get_font(14))
-                
-                if integration > 0:
-                    integration_text = format_duration(integration)
-                    
-                    integration_textbox = ctk.CTkTextbox(session_content, height=25)
-                    integration_textbox.pack(fill="x", padx=10, pady=(0, 5))
-                    integration_textbox.insert("1.0", f"Integration: {integration_text}")
-                    integration_textbox.configure(state="disabled", font=self.get_font(14))
-                
-                # Exposure breakdown section
+
+                # Time
+                time_text = f"{start_str} → {end_str}"
+                if span_text:
+                    time_text += f" ({span_text})"
+                info_row(session_content, "Time", time_text, small=True)
+
+                # Captures
+                capture_text = f"{lights} lights"
+                if int_text:
+                    capture_text += f" · {int_text} integration"
+                info_row(session_content, "Captures", capture_text, small=True)
+
+                # Exposure breakdown
                 if lights_by_exposure:
-                    exp_label = ctk.CTkLabel(session_content, text="Exposure Breakdown:", font=self.get_font(12, weight="bold"))
-                    exp_label.pack(anchor="w", padx=10, pady=(5, 2))
-                    
-                    for exp, count in sorted(lights_by_exposure.items()):
-                        exp_textbox = ctk.CTkTextbox(session_content, height=25)
-                        exp_textbox.pack(fill="x", padx=10, pady=1)
-                        exp_textbox.insert("1.0", f"{exp}s: {count} frames")
-                        exp_textbox.configure(state="disabled", font=self.get_font(12))
-                
-                if exposures:
-                    exp_text = ', '.join([f"{e}s" for e in exposures])
-                    exp_textbox = ctk.CTkTextbox(session_content, height=25)
-                    exp_textbox.pack(fill="x", padx=10, pady=(2, 10))
-                    exp_textbox.insert("1.0", f"Exposures: {exp_text}")
-                    exp_textbox.configure(state="disabled", font=self.get_font(14))
-    
+                    exp_parts = [f"{int(exp)}s × {count}" for exp, count in sorted(lights_by_exposure.items())]
+                    info_row(session_content, "Exposures", " · ".join(exp_parts), small=True)
+
+                # Filter breakdown
+                if lights_by_filter:
+                    filter_parts = [f"{filt}: {count}" for filt, count in sorted(lights_by_filter.items())]
+                    info_row(session_content, "Filters", " · ".join(filter_parts), small=True)
+
+                # Capture location (per session, since imaging site can change)
+                if latitude and longitude:
+                    loc_text = ""
+                    if site:
+                        loc_text += f"{site} · "
+                    loc_text += f"Lat: {latitude}, Lon: {longitude}"
+                    info_row(session_content, "Capture Location", loc_text, small=True)
+
+                    loc_btn_frame = ctk.CTkFrame(session_content, fg_color="transparent")
+                    loc_btn_frame.pack(fill="x", padx=10, pady=(0, 5))
+
+                    lat_s = str(latitude)
+                    lon_s = str(longitude)
+                    tag = self.location_tags.get_tag(lat_s, lon_s)
+
+                    maps_btn = ctk.CTkButton(
+                        loc_btn_frame,
+                        text="🗺 Open in Google Maps",
+                        width=150,
+                        height=24,
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
+                        command=lambda ls=lat_s, ln=lon_s: self.open_google_maps(ls, ln)
+                    )
+                    maps_btn.pack(side="left", padx=(0, 5))
+
+                    tag_btn_text = "✏ Edit Tag" if tag else "➕ Add Tag"
+                    tag_btn = ctk.CTkButton(
+                        loc_btn_frame,
+                        text=tag_btn_text,
+                        width=90,
+                        height=24,
+                        fg_color=SECONDARY,
+                        hover_color=SECONDARY_HOVER,
+                        command=lambda ls=lat_s, ln=lon_s: self.open_tag_dialog(ls, ln)
+                    )
+                    tag_btn.pack(side="left")
+
+                # Action buttons
+                btn_frame = ctk.CTkFrame(session_content, fg_color="transparent")
+                btn_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+                preview_btn = ctk.CTkButton(
+                    btn_frame,
+                    text="🔍 Preview",
+                    width=100,
+                    height=28,
+                    fg_color=SECONDARY,
+                    hover_color=SECONDARY_HOVER,
+                    command=lambda p=project, o=obj: self.open_image_preview(p, o)
+                )
+                preview_btn.pack(side="left")
+
+        # Reset scroll position so the new content starts at the top
+        self._scroll_details_to_top()
+
     def toggle_expandable_section(self, button, content_frame):
         """Toggle visibility of an expandable section with accordion behavior."""
         if content_frame.winfo_ismapped():
