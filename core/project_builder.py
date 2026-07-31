@@ -4,12 +4,12 @@ Creates project folder structure and copies FITS files.
 """
 
 from pathlib import Path
-from typing import List, Dict
-from shutil import copy2
+from typing import List, Dict, Tuple
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from .fits_metadata import FitsMetadata
 from .frame_classifier import FrameClassifier, FrameType
+from .utils import safe_copy
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +118,8 @@ class ProjectBuilder:
         self.raw_dir = raw_dir
         self.projects_dir = projects_dir
         self.projects: List[Project] = []
+        # Files that failed to copy: list of (source_path, error_message)
+        self.copy_errors: List[Tuple[Path, str]] = []
     
     def scan_raw_folders(self) -> List[Path]:
         """Scan for *_sub or *_subs folders in raw directory."""
@@ -249,13 +251,16 @@ class ProjectBuilder:
             
             dest_file = dest_folder / fits_path.name
             
-            if dest_folder.exists():
-                # Skip if file already exists
+            # Copy the file, but never let a single bad file abort the batch.
+            try:
                 if dest_file.exists():
                     logger.info(f"Skipping existing file: {fits_path.name}")
                 else:
-                    copy2(fits_path, dest_file)
+                    safe_copy(fits_path, dest_file)
                     logger.info(f"Copied: {fits_path.name} to {dest_folder.name}")
+            except Exception as copy_err:
+                self.copy_errors.append((fits_path, str(copy_err)))
+                logger.error(f"Failed to copy {fits_path}: {copy_err}")
         
         self.projects.append(project)
         return project

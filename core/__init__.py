@@ -12,7 +12,7 @@ from .frame_classifier import FrameClassifier, FrameType
 from .project_builder import ProjectBuilder, Project, ProjectMetrics, FitsFile
 from .project_analyzer import ProjectAnalyzer, ProjectAnalysis, AggregateAnalysis
 from .image_quality import ImageQualityAnalyzer, QualityReport, analyze_image_quality
-from .utils import get_storage_path, setup_logging
+from .utils import get_storage_path, setup_logging, safe_copy, extended_path
 
 __all__ = [
     'AppSettings',
@@ -31,5 +31,7 @@ __all__ = [
     'QualityReport',
     'analyze_image_quality',
     'get_storage_path',
-    'setup_logging'
+    'setup_logging',
+    'safe_copy',
+    'extended_path'
 ]

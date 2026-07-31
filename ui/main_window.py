@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Import core business logic
 
-from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer
+from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer, safe_copy
 
 
 
@@ -1547,25 +1547,61 @@ class SeestarApp(ctk.CTk):
 
             
 
-            # Show completion dialog
+            # Collect any per-file copy failures so the user is warned instead
 
-            self.after(0, lambda: messagebox.showinfo(
+            # of silently missing files.
 
-                "Processing Complete",
+            copy_errors = list(getattr(self, 'seestar_copy_errors', []))
+
+            copy_errors.extend(builder.copy_errors)
+
+            
+
+            summary = (
 
                 f"Successfully built {len(self.projects)} project(s):\n\n" +
 
                 "\n".join([f"  • {p.name}" for p in self.projects])
 
-            ))
+            )
+
+            
+
+            if copy_errors:
+
+                sample = "\n".join(
+
+                    f"  • {Path(p).name}: {err}" for p, err in copy_errors[:10]
+
+                )
+
+                more = f"\n  ...and {len(copy_errors) - 10} more" if len(copy_errors) > 10 else ""
+
+                warn_msg = (
+
+                    f"{len(copy_errors)} file(s) could not be copied and were skipped:\n\n"
+
+                    f"{sample}{more}"
+
+                )
+
+                self.after(0, lambda m=warn_msg: messagebox.showwarning("Some files were skipped", m))
+
+            
+
+            # Show completion dialog
+
+            self.after(0, lambda m=summary: messagebox.showinfo("Processing Complete", m))
 
             
 
         except Exception as e:
 
-            logger.error(f"Error during scan: {e}")
+            logger.error(f"Error during scan: {e}", exc_info=True)
 
-            self.after(0, lambda: messagebox.showerror("Error", f"Failed to scan: {str(e)}"))
+            error_msg = str(e)
+
+            self.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to scan: {msg}"))
 
         
 
@@ -1647,35 +1683,34 @@ class SeestarApp(ctk.CTk):
 
         
 
+        # Files that failed to copy across all folders: (source_path, error)
+        self.seestar_copy_errors = []
+
         def copy_single_file(fits_file, raw_folder):
 
-            """Copy a single file and return (copied, skipped) status."""
+            """Copy one file. Returns (copied, skipped, error_or_None).
+
+            Never raises - a single bad file must not abort the whole batch."""
 
             dest_file = raw_folder / fits_file.name
 
-            
+            try:
 
-            if dest_file.exists():
+                if dest_file.exists():
 
-                # Compare file sizes
+                    # Compare file sizes; skip only if identical
 
-                src_size = fits_file.stat().st_size
+                    if fits_file.stat().st_size == dest_file.stat().st_size:
 
-                dest_size = dest_file.stat().st_size
+                        return (0, 1, None)  # skipped
 
-                
+                safe_copy(fits_file, dest_file)
 
-                if src_size == dest_size:
+                return (1, 0, None)  # copied
 
-                    return (0, 1)  # skipped
+            except Exception as copy_err:
 
-            
-
-            # Copy the file
-
-            shutil.copy2(fits_file, dest_file)
-
-            return (1, 0)  # copied
+                return (0, 0, (fits_file, str(copy_err)))
 
         
 
@@ -1729,11 +1764,17 @@ class SeestarApp(ctk.CTk):
 
                 for future in futures:
 
-                    copied, skipped = future.result()
+                    copied, skipped, error = future.result()
 
                     files_copied += copied
 
                     files_skipped += skipped
+
+                    if error:
+
+                        self.seestar_copy_errors.append(error)
+
+                        logger.error(f"Failed to copy {error[0]}: {error[1]}")
 
             
 
@@ -1869,11 +1910,13 @@ class SeestarApp(ctk.CTk):
 
         except Exception as e:
 
-            logger.error(f"Error during analysis: {e}")
+            logger.error(f"Error during analysis: {e}", exc_info=True)
 
-            self.after(0, lambda: self.progress_label.configure(text=f"Error: {str(e)}"))
+            error_msg = str(e)
 
-            self.after(0, lambda: messagebox.showerror("Error", f"Failed to analyze projects: {str(e)}"))
+            self.after(0, lambda msg=error_msg: self.progress_label.configure(text=f"Error: {msg}"))
+
+            self.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to analyze projects: {msg}"))
 
         
 
@@ -2041,11 +2084,13 @@ class SeestarApp(ctk.CTk):
 
         except Exception as e:
 
-            logger.error(f"Error copying Planetary & Scenery: {e}")
+            logger.error(f"Error copying Planetary & Scenery: {e}", exc_info=True)
 
-            self.after(0, lambda: self.progress_label.configure(text=f"Error: {str(e)}"))
+            error_msg = str(e)
 
-            self.after(0, lambda: messagebox.showerror("Error", f"Failed to copy media: {str(e)}"))
+            self.after(0, lambda msg=error_msg: self.progress_label.configure(text=f"Error: {msg}"))
+
+            self.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to copy media: {msg}"))
 
         
 
