@@ -152,7 +152,7 @@ class ProjectBuilder:
                 total += len(fits_files)
         return total
     
-    def build_project(self, source_folder: Path, progress_callback=None, global_progress=None, selected_file_types=None) -> Project:
+    def build_project(self, source_folder: Path, progress_callback=None, global_progress=None, selected_file_types=None, cancel_check=None) -> Project:
         """Build a project from a source folder.
         
         Args:
@@ -161,6 +161,7 @@ class ProjectBuilder:
             global_progress: Optional dict with 'current' and 'total' for cross-project progress tracking
             selected_file_types: Optional set of file extensions to copy (e.g., {'.fits', '.FIT'}).
                                 If None, copies all FITS files.
+            cancel_check: Optional callable returning True to abort copying early.
         """
         # Extract project name from folder name
         # m3_subs or m3_sub -> M3_Project
@@ -222,6 +223,10 @@ class ProjectBuilder:
         
         # Now copy files based on classification (this is sequential but metadata is already extracted)
         for i, (fits_path, frame) in enumerate(processed_files):
+            # Stop early if the user requested cancellation
+            if cancel_check and cancel_check():
+                logger.info(f"Build cancelled by user during {source_folder.name}")
+                break
             # Update project-level progress
             if progress_callback:
                 progress_callback(i + 1, total_files, f"Processing {fits_path.name}")

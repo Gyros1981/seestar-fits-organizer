@@ -4,6 +4,7 @@
   "disclaimer_acknowledged": true,
   "coordinate_format": "degrees",
   "text_scale": 1.4,
+  "session_gap_hours": 2.0,
   "seestar_dir": "F:/MyWorks",
   "raw_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S30 Pro/Raw",
   "projects_dir": "C:/Users/Guy/Desktop/Astrophotography/Images/Seestar S30 Pro/Projects",

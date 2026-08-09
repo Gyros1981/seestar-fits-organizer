@@ -9,6 +9,7 @@ from .folder_selection_dialog import FolderSelectionWindow
 from .analysis_window import AnalysisWindow
 from .preview_window import PreviewWindow
 from .file_type_selection_dialog import FileTypeSelectionDialog, detect_file_types_in_directories
+from .copy_progress_dialog import CopyProgressWindow
 from .main_window import SeestarApp
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     'PreviewWindow',
     'FileTypeSelectionDialog',
     'detect_file_types_in_directories',
+    'CopyProgressWindow',
     'SeestarApp'
 ]

@@ -37,6 +37,7 @@ from core import AppSettings, LocationTags, ProjectBuilder, ProjectAnalyzer, saf
 # Import UI components
 
 from ui import DisclaimerWindow, FolderSelectionWindow, AnalysisWindow, FileTypeSelectionDialog, detect_file_types_in_directories
+from ui.copy_progress_dialog import CopyProgressWindow
 
 
 
@@ -75,6 +76,8 @@ class SeestarApp(ctk.CTk):
         self.analyze_projects_dirs = []  # List of project directories to analyze
 
         self.projects = []
+
+        self._copy_dialog = None  # Active copy progress popup, if any
 
         
 
@@ -1380,7 +1383,41 @@ class SeestarApp(ctk.CTk):
 
                 self.after(0, lambda: self.progress_label.configure(text=f"Copying {len(selected_folders)} folders to Raw..."))
 
-                self.copy_seestar_to_raw(selected_folders, selected_file_types)
+                self._open_copy_progress("Copying Files")
+
+                self._set_copy_phase("Copying from Seestar to Raw...")
+
+                self.copy_seestar_to_raw(
+
+                    selected_folders,
+
+                    selected_file_types,
+
+                    progress_callback=lambda cur, tot, name: self.after(
+
+                        0, lambda: self._update_copy_progress(cur, tot, (cur / tot if tot else 0), name)
+
+                    ),
+
+                    cancel_check=self._copy_is_cancelled,
+
+                )
+
+                
+
+                # Respect cancellation from the copy popup
+
+                if self._copy_is_cancelled():
+
+                    self._close_copy_progress()
+
+                    self.after(0, lambda: self.progress_label.configure(text="Copy cancelled."))
+
+                    self.after(0, lambda: self.set_ui_state(True))
+
+                    self.after(0, lambda: self.hide_loading_spinner())
+
+                    return
 
                 
 
@@ -1513,6 +1550,18 @@ class SeestarApp(ctk.CTk):
 
             
 
+            # Ensure the copy popup is visible (direct flow opens it here;
+
+            # intermediate flow already opened it for the Seestar->Raw phase).
+
+            if getattr(self, '_copy_dialog', None) is None:
+
+                self._open_copy_progress("Copying Files")
+
+            self._set_copy_phase("Copying files to projects...")
+
+            
+
             # Set up global progress tracking
 
             global_progress = {
@@ -1535,9 +1584,31 @@ class SeestarApp(ctk.CTk):
 
             for folder in build_folders:
 
-                project = builder.build_project(folder, global_progress=global_progress, selected_file_types=selected_file_types)
+                if self._copy_is_cancelled():
+
+                    break
+
+                project = builder.build_project(folder, global_progress=global_progress, selected_file_types=selected_file_types, cancel_check=self._copy_is_cancelled)
 
                 self.projects.append(project)
+
+            
+
+            # Close the popup now that copying is done or cancelled
+
+            self._close_copy_progress()
+
+            
+
+            if self._copy_is_cancelled():
+
+                self.after(0, lambda: self.progress_label.configure(text="Copy cancelled."))
+
+                self.after(0, lambda: self.set_ui_state(True))
+
+                self.after(0, lambda: self.hide_loading_spinner())
+
+                return
 
             
 
@@ -1607,6 +1678,10 @@ class SeestarApp(ctk.CTk):
 
         finally:
 
+            # Always close the copy popup if it is still open
+
+            self._close_copy_progress()
+
             self.after(0, lambda: self.set_ui_state(True))
 
             self.after(0, lambda: self.hide_loading_spinner())
@@ -1635,11 +1710,77 @@ class SeestarApp(ctk.CTk):
 
         self.progress_label.configure(text=f"{message} ({current}/{total})")
 
+        # Mirror progress into the popup copy dialog if it is open
+
+        dlg = getattr(self, '_copy_dialog', None)
+
+        if dlg is not None and dlg.winfo_exists():
+
+            dlg.update_progress(current, total, percentage, message)
+
         self.update_idletasks()  # Force UI update
 
     
 
-    def copy_seestar_to_raw(self, folders=None, selected_file_types=None):
+    def _open_copy_progress(self, title="Copying Files"):
+
+        """Create the copy progress popup on the UI thread and return it.
+
+        Safe to call from a worker thread - it blocks until the dialog exists."""
+
+        created = threading.Event()
+
+        def _make():
+
+            self._copy_dialog = CopyProgressWindow(self, title=title, settings=self.settings)
+
+            created.set()
+
+        self.after(0, _make)
+
+        created.wait()
+
+        return self._copy_dialog
+
+    
+
+    def _set_copy_phase(self, text):
+
+        """Update the popup's phase heading from a worker thread."""
+
+        dlg = getattr(self, '_copy_dialog', None)
+
+        if dlg is not None:
+
+            self.after(0, lambda t=text: dlg.set_phase(t) if dlg.winfo_exists() else None)
+
+    
+
+    def _close_copy_progress(self):
+
+        """Close and clear the copy progress popup from a worker thread."""
+
+        dlg = getattr(self, '_copy_dialog', None)
+
+        if dlg is not None:
+
+            self.after(0, dlg.close)
+
+        self._copy_dialog = None
+
+    
+
+    def _copy_is_cancelled(self):
+
+        """Return True if the user pressed Cancel on the copy popup."""
+
+        dlg = getattr(self, '_copy_dialog', None)
+
+        return bool(dlg is not None and dlg.is_cancelled())
+
+    
+
+    def copy_seestar_to_raw(self, folders=None, selected_file_types=None, progress_callback=None, cancel_check=None):
 
         """Copy <NAME>_sub folders from Seestar to Raw directory.
 
@@ -1652,6 +1793,10 @@ class SeestarApp(ctk.CTk):
             selected_file_types: Optional set of file extensions to copy (e.g., {'.fits', '.FIT'}).
 
                                If None, copies all FITS files.
+
+            progress_callback: Optional callable(current, total, filename) invoked per file.
+
+            cancel_check: Optional callable returning True to abort the copy early.
 
         """
 
@@ -1686,6 +1831,32 @@ class SeestarApp(ctk.CTk):
         # Files that failed to copy across all folders: (source_path, error)
         self.seestar_copy_errors = []
 
+        def list_folder_files(folder):
+
+            if selected_file_types:
+
+                files = []
+
+                for ext in selected_file_types:
+
+                    files.extend(list(folder.glob(f'*{ext}')))
+
+                return files
+
+            return list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
+
+        
+
+        # Pre-scan so overall progress is accurate across all folders
+
+        folder_files = [(folder, list_folder_files(folder)) for folder in folders]
+
+        total = sum(len(files) for _, files in folder_files)
+
+        current = 0
+
+        
+
         def copy_single_file(fits_file, raw_folder):
 
             """Copy one file. Returns (copied, skipped, error_or_None).
@@ -1714,33 +1885,21 @@ class SeestarApp(ctk.CTk):
 
         
 
-        for folder in folders:
+        for folder, files_to_copy in folder_files:
+
+            if cancel_check and cancel_check():
+
+                logger.info("Copy to Raw cancelled by user")
+
+                return
+
+            
 
             # Create corresponding folder in Raw
 
             raw_folder = self.raw_dir / folder.name
 
             raw_folder.mkdir(parents=True, exist_ok=True)
-
-            
-
-            # Get files based on selected file types
-
-            if selected_file_types:
-
-                # Copy only selected file types
-
-                files_to_copy = []
-
-                for ext in selected_file_types:
-
-                    files_to_copy.extend(list(folder.glob(f'*{ext}')))
-
-            else:
-
-                # Copy all FITS files (default behavior)
-
-                files_to_copy = list(folder.glob('*.fits')) + list(folder.glob('*.FIT'))
 
             
 
@@ -1754,21 +1913,33 @@ class SeestarApp(ctk.CTk):
 
             with ThreadPoolExecutor(max_workers=4) as executor:
 
-                futures = []
+                future_to_name = {}
 
                 for fits_file in files_to_copy:
 
-                    futures.append(executor.submit(copy_single_file, fits_file, raw_folder))
+                    if cancel_check and cancel_check():
+
+                        break
+
+                    fut = executor.submit(copy_single_file, fits_file, raw_folder)
+
+                    future_to_name[fut] = fits_file.name
 
                 
 
-                for future in futures:
+                for future in future_to_name:
 
                     copied, skipped, error = future.result()
 
                     files_copied += copied
 
                     files_skipped += skipped
+
+                    current += 1
+
+                    if progress_callback:
+
+                        progress_callback(current, total, future_to_name[future])
 
                     if error:
 
